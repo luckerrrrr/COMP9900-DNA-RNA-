@@ -1,0 +1,67 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -N capstone-container-run
+
+set -euo pipefail
+
+# Recommended: submit from scratch to avoid writing outputs to HOME
+# Option A: qsub directly from /srv/scratch/$USER/capstone-project
+# Option B: mirror the working directory into scratch before running
+# mkdir -p /srv/scratch/$USER/capstone-project-run
+# cp -r "$PBS_O_WORKDIR"/* /srv/scratch/$USER/capstone-project-run/ || true
+# cd /srv/scratch/$USER/capstone-project-run
+cd "$PBS_O_WORKDIR"  # OK if already submitted from scratch
+
+############################ container ############################
+
+# Store the SIF in scratch to save HOME quota
+SIF="/srv/scratch/$USER/images/p3.sif"
+DEF="container/p3.def"
+RUNCONF="configs/container_run.txt"
+
+# Redirect Apptainer build/cache directories to scratch
+export APPTAINER_TMPDIR="/srv/scratch/$USER/apptainer_tmp"
+export APPTAINER_CACHEDIR="/srv/scratch/$USER/apptainer_cache"
+mkdir -p "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR" "$(dirname "$SIF")"
+
+# Build the image if it doesn't exist
+if [ ! -f "$SIF" ]; then
+  echo "[build] $SIF doesn't exist, starting build..."
+  echo "[build] Using tmpdir: $APPTAINER_TMPDIR"
+  apptainer build "$SIF" "$DEF"
+else
+  echo "[build] Image exists: $SIF (skip build)"
+fi
+
+# Read the container entry command from config
+if [ ! -f "$RUNCONF" ]; then
+  echo "❌ Config file not found: $RUNCONF"
+  exit 1
+fi
+ENTRYLINE=$(cat "$RUNCONF")
+echo "[run] Will run in container: python $ENTRYLINE"
+
+# Point Hugging Face/transformers caches to scratch
+HF_CACHE_DIR="/srv/scratch/$USER/hf_cache"
+mkdir -p "$HF_CACHE_DIR"
+
+# Also redirect pip cache and user base to scratch
+export PIP_CACHE_DIR="/srv/scratch/$USER/pip_cache"
+export PYTHONUSERBASE="/srv/scratch/$USER/pyuserbase"
+mkdir -p "$PIP_CACHE_DIR" "$PYTHONUSERBASE"
+
+BIND_MOUNTS="$PWD:$PWD,$HF_CACHE_DIR:$HF_CACHE_DIR,$PIP_CACHE_DIR:$PIP_CACHE_DIR,$PYTHONUSERBASE:$PYTHONUSERBASE"
+
+# No runtime pip installation (handled during image build)
+
+# Run the container
+apptainer run --nv \
+  --bind "$BIND_MOUNTS" \
+  --env HF_HOME="$HF_CACHE_DIR" \
+  --env TRANSFORMERS_CACHE="$HF_CACHE_DIR/transformers" \
+  --env HF_DATASETS_CACHE="$HF_CACHE_DIR/datasets" \
+  --env PIP_CACHE_DIR="$PIP_CACHE_DIR" \
+  --env PYTHONUSERBASE="$PYTHONUSERBASE" \
+  "$SIF" $ENTRYLINE
