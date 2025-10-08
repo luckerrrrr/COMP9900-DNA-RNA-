@@ -2,5 +2,8 @@
 __pycache__/
 
 capstone-container-run*
+logs/
+*_logs/
 
 container/p3.sif
+configs/container_run*.txt

@@ -1,6 +1,92 @@
 [![Open in Visual Studio Code](https://classroom.github.com/assets/open-in-vscode-2e0aaae1b6195c2367325f4f02e2d04e9abb55f0b24a779b69b11b9e10269abc.svg)](https://classroom.github.com/online_ide?assignment_repo_id=20545616&assignment_repo_type=AssignmentRepo)
 
-# 🚀 Getting Started on UNSW Katana HPC
+# 🚀 Capstone Project ID 3 — Deep Mining the Genome’s Dark Matter  
+### (9900-F09C-DONUT Team)
+
+---
+
+## 🧭 1. Integrated Training Command on Katana  
+> 💡 **Recommended way to train models** — one command to pull code, configure models, and submit PBS jobs automatically.  
+
+### ▶️ Run the Integrated Launcher
+
+Login to Katana, go to your project directory:
+```bash
+ssh zID@katana.restech.unsw.edu.au
+mkdir /srv/scratch/$USER/capstone-project-25t3-9900-f09c-donut
+git clone git@github.com:unsw-cse-comp99-3900/capstone-project-25t3-9900-f09c-donut.git
+```
+
+Then simply run:
+```bash
+chmod +x ./train_launcher.sh
+./train_launcher.sh [branch] [model]
+```
+
+### Example Commands
+| Command	| Description |
+| ----------- | ----------- |
+| ```./train_launcher.sh```	| Train all models using the local code |
+| ```./train_launcher.sh --branch dev --model gpn``` |	Pull branch ```dev``` and train only the ```gpn``` model |
+| ```./train_launcher.sh --branch main --model both``` | Pull branch ```main``` and train all available models |
+| ```./train_launcher.sh --branch local --model gpn-msa``` | Train only ```gpn-msa``` model using local code |
+
+### Parameters
+| Parameter	| Description | Default |
+| ----------- | ----------- | ---------- |
+| `--branch` |	Git branch name. If `local`, uses local code without pulling from remote. | `local`
+| `--model` |	Model name to train (`gpn`, `gpn-msa`) or `both` for both models. | `both`
+
+### What Happens Internally
+
+1️⃣ Git Management
+
+Pulls the specified branch from remote (`git fetch`, `git checkout`, `git pull`)
+
+Skips pulling if you pass `local`
+
+2️⃣ Model Selection
+
+Trains one or both models as defined in dir `configs`
+
+Automatically updates the container run configuration file in `configs`:
+```bash
+configs/container_run_gpn.txt
+configs/container_run_gpn-msa.txt
+```
+
+3️⃣ Container Configuration
+
+The file `container_run_*.txt` is cleared and regenerated for each job:
+```bash
+src/gpn_test.py
+src/gpn-msa_test.py
+```
+These files act as the Python entry points for Apptainer container execution.
+
+4️⃣ PBS Job Submission
+
+- Each model job is submitted to Katana with a unique name:
+```
+train-gpn-153012
+train-gpn-msa-153013
+```
+
+- The command used internally:
+```
+qsub -N "$JOB_NAME" -o "logs/training_logs/" -v MODEL_NAME="$M",RUNCONF="$CONFIG_FILE" "$PBS_SCRIPT"
+```
+
+### Log Review Tips
+|Log Type	|Path	|Purpose|
+| ----------- | ----------- | ---------- |
+|Launcher Log |	```logs/launcher_logs/launcher_<timestamp>.log``` |	Tracks all submission activity|
+|PBS Output Log |```logs/training_logs/train-<model>.o<JOBID>```|	Contains container stdout/stderr|
+|Config File|	```configs/container_run.txt```|	Shows which Python file is executed in container|
+
+
+
+## 🧭 2. Getting Started Directly on UNSW Katana HPC
 
 This guide explains how to:
 
@@ -11,7 +97,7 @@ This guide explains how to:
 
 ---
 
-## 🧭 1. SSH into Katana
+### 🧭 1. SSH into Katana
 
 To work on Katana, open your terminal or VS Code and connect via SSH:
 
@@ -24,7 +110,7 @@ ssh zID@katana.restech.unsw.edu.au
 
 ---
 
-## 📥 2. Clone the Repository on Katana
+### 📥 2. Clone the Repository on Katana
 
 Once you’re logged into Katana, clone the project directly into your home directory:
 
@@ -61,7 +147,7 @@ capstone-project-25t3-9900-f09c-donut/
 
 ---
 
-## 🐳 3. Run the Demo on Katana
+### 🐳 3. Run the Demo on Katana
 
 Submit the job:
 
@@ -79,9 +165,9 @@ When it finishes, you’ll see logs like `run.pbs.oXXXXXXX` in the same director
 
 ---
 
-## ⚙️ 4. Key Configuration Files Explained
+### ⚙️ 4. Key Configuration Files Explained
 
-### `run.pbs` — HPC Job Script
+#### `run.pbs` — HPC Job Script
 
 Controls how the job runs on Katana:
 
@@ -104,7 +190,7 @@ apptainer run container/p3.sif python3 src/gpn_test.py
 
 ---
 
-### `container/p3.def` — Container Definition
+#### `container/p3.def` — Container Definition
 
 Defines how the container is built. It typically includes:
 
@@ -116,7 +202,7 @@ Once built, it becomes `p3.sif`, which is executed by the PBS script.
 
 ---
 
-### `configs/container_run.txt` — Container Runtime Settings
+#### `configs/container_run.txt` — Container Runtime Settings
 
 Optional settings for container execution, e.g.:
 
@@ -126,7 +212,7 @@ Optional settings for container execution, e.g.:
 
 ---
 
-### `requirements.txt` — Python Dependencies
+#### `requirements.txt` — Python Dependencies
 
 Specifies Python libraries installed inside the container. For example:
 
@@ -139,7 +225,7 @@ scikit-learn
 
 ---
 
-## 🧪 5. Verify Model Import
+### 🧪 5. Verify Model Import
 
 Check the log file — it should contain:
 
@@ -151,10 +237,12 @@ Model class: ConvNetForMaskedLM
 
 This confirms the container and dependencies are correctly set up.
 
----
 
 ## ✅ Summary
 
+This project now supports both **manual job submission** and a **one-command automated training launcher** on UNSW Katana HPC.
+
+- ✅ Use the integrated launcher script to automatically → `./train_launcher.sh [--branch <branch_name|local>] [--model <gpn|gpn-msa|both>]`
 - ✅ SSH into Katana → `ssh zID@katana.restech.unsw.edu.au`  
 - ✅ Clone the repo → `git clone ...`  
 - ✅ Navigate into project folder  

@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l select=1:ncpus=8:mem=64gb
 #PBS -l walltime=02:00:00
 #PBS -j oe
 #PBS -N capstone-container-run
@@ -19,7 +19,7 @@ cd "$PBS_O_WORKDIR"  # OK if already submitted from scratch
 # Store the SIF in scratch to save HOME quota
 SIF="/srv/scratch/$USER/images/p3.sif"
 DEF="container/p3.def"
-RUNCONF="configs/container_run.txt"
+RUNCONF="${RUNCONF:-configs/container_run_gpn.txt}"
 
 # Redirect Apptainer build/cache directories to scratch
 export APPTAINER_TMPDIR="/srv/scratch/$USER/apptainer_tmp"
