@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l select=1:ncpus=16:mem=64gb
 #PBS -l walltime=02:00:00
 #PBS -j oe
 #PBS -N capstone-container-run
@@ -21,18 +21,60 @@ SIF="/srv/scratch/$USER/images/p3.sif"
 DEF="container/p3.def"
 RUNCONF="${RUNCONF:-configs/container_run_gpn.txt}"
 
+# ---------- Build image if missing or outdated ----------
+REQ_FILE="requirements.txt"
+HASH_FILE="${SIF}.build_hash"
+
+# check hash on requirements.txt to check whether changes
+if [ -f "$REQ_FILE" ]; then
+  CUR_HASH=$(md5sum "$REQ_FILE" | awk '{print $1}')
+else
+  CUR_HASH="none"
+fi
+
+NEED_REBUILD=false
+
 # Redirect Apptainer build/cache directories to scratch
 export APPTAINER_TMPDIR="/srv/scratch/$USER/apptainer_tmp"
 export APPTAINER_CACHEDIR="/srv/scratch/$USER/apptainer_cache"
 mkdir -p "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR" "$(dirname "$SIF")"
 
+
 # Build the image if it doesn't exist
+# if [ ! -f "$SIF" ]; then
+#   echo "[build] $SIF doesn't exist, starting build..."
+#   echo "[build] Using tmpdir: $APPTAINER_TMPDIR"
+#   apptainer build "$SIF" "$DEF"
+# else
+#   echo "[build] Image exists: $SIF (skip build)"
+# fi
 if [ ! -f "$SIF" ]; then
-  echo "[build] $SIF doesn't exist, starting build..."
-  echo "[build] Using tmpdir: $APPTAINER_TMPDIR"
-  apptainer build "$SIF" "$DEF"
+  echo "[build] SIF not found, will build."
+  NEED_REBUILD=true
+elif [ ! -f "$HASH_FILE" ]; then
+  echo "[build] No previous build hash found, will rebuild."
+  NEED_REBUILD=true
 else
-  echo "[build] Image exists: $SIF (skip build)"
+  OLD_HASH=$(cat "$HASH_FILE")
+  if [ "$CUR_HASH" != "$OLD_HASH" ]; then
+    echo "[build] requirements.txt changed, will rebuild."
+    NEED_REBUILD=true
+  else
+    echo "[build] Image up-to-date (hash matched)."
+  fi
+fi
+
+# Start build
+if [ "$NEED_REBUILD" = true ]; then
+  echo "[build] Rebuilding $SIF ..."
+  if [ -f "$SIF" ]; then
+    echo "[build] Removing old image: $SIF"
+    rm -f "$SIF"
+  fi
+  apptainer build "$SIF" "$DEF"
+  echo "$CUR_HASH" > "$HASH_FILE"
+else
+  echo "[build] Skip build (no changes detected)."
 fi
 
 # Read the container entry command from config
@@ -56,12 +98,28 @@ BIND_MOUNTS="$PWD:$PWD,$HF_CACHE_DIR:$HF_CACHE_DIR,$PIP_CACHE_DIR:$PIP_CACHE_DIR
 
 # No runtime pip installation (handled during image build)
 
+PROJECT_ROOT="${PBS_O_WORKDIR:-$PWD}"
+PYTHON_SRC="${PROJECT_ROOT}/src"
+PYTHON_DATA="${PROJECT_ROOT}/data"
+
+PYTHONPATH="${PYTHONPATH:-}"
+
+echo "[env] Project root: $PROJECT_ROOT"
+echo "[env] Setting PYTHONPATH for src/ and data/"
+export PYTHONPATH="$PROJECT_ROOT:$PYTHON_SRC:$PYTHON_DATA:$PYTHONPATH"
+export USER=$(whoami)
+
+echo "[debug] USER=$USER"
+
+#   --env TRANSFORMERS_CACHE="$HF_CACHE_DIR/transformers" \
+
 # Run the container
 apptainer run --nv \
   --bind "$BIND_MOUNTS" \
   --env HF_HOME="$HF_CACHE_DIR" \
-  --env TRANSFORMERS_CACHE="$HF_CACHE_DIR/transformers" \
   --env HF_DATASETS_CACHE="$HF_CACHE_DIR/datasets" \
   --env PIP_CACHE_DIR="$PIP_CACHE_DIR" \
   --env PYTHONUSERBASE="$PYTHONUSERBASE" \
+  --env PYTHONPATH="$PYTHONPATH" \
+  --env USER="$USER" \
   "$SIF" $ENTRYLINE
