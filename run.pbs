@@ -19,7 +19,7 @@ cd "$PBS_O_WORKDIR"  # OK if already submitted from scratch
 # Store the SIF in scratch to save HOME quota
 SIF="/srv/scratch/$USER/images/p3.sif"
 DEF="container/p3.def"
-RUNCONF="${RUNCONF:-configs/container_run_gpn.txt}"
+RUNCONF="${RUNCONF:-configs/container_test.txt}"
 
 # ---------- Build image if missing or outdated ----------
 REQ_FILE="requirements.txt"

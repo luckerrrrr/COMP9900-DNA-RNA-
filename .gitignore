@@ -6,4 +6,5 @@ logs/
 *_logs/
 
 container/p3.sif
-configs/container_run*.txt
+
+/cache/**

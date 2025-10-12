@@ -20,22 +20,28 @@ git clone git@github.com:unsw-cse-comp99-3900/capstone-project-25t3-9900-f09c-do
 Then simply run:
 ```bash
 chmod +x ./train_launcher.sh
-./train_launcher.sh [branch] [model]
+./train_launcher.sh --branch <branch> --model <m1> <m2> ... --data-loader
 ```
 
 ### Example Commands
 | Command	| Description |
 | ----------- | ----------- |
-| ```./train_launcher.sh```	| Train all models using the local code |
-| ```./train_launcher.sh --branch dev --model gpn``` |	Pull branch ```dev``` and train only the ```gpn``` model |
-| ```./train_launcher.sh --branch main --model both``` | Pull branch ```main``` and train all available models |
-| ```./train_launcher.sh --branch local --model gpn-msa``` | Train only ```gpn-msa``` model using local code |
+| `./train_launcher.sh`	| 🚀 Run all models and the data-loader module using local code (default mode). |
+| `./train_launcher.sh --model gpn` |	Train only the GPN model. |
+| `./train_launcher.sh --model gpn gpn-msa` | Train both GPN and GPN-MSA models explicitly. |
+| `./train_launcher.sh --model` |	Shortcut: Run both models (GPN + GPN-MSA), exclude data-loader. |
+|`./train_launcher.sh --data-loader`	| Run only the data-loader module. |
+| `./train_launcher.sh --model gpn --data-loader` |	Run GPN model and data-loader together. |
+| `./train_launcher.sh --branch dev --model gpn-msa` |	Pull branch `dev` and train only GPN-MSA model. |
+| `./train_launcher.sh --branch main --model both` |	Pull branch `main` and train both models (equivalent to `--model gpn gpn-msa`). |
+| `./train_launcher.sh --branch local` |	Run all configs (models + data-loader) using local code, without Git pull. |
 
 ### Parameters
 | Parameter	| Description | Default |
 | ----------- | ----------- | ---------- |
-| `--branch` |	Git branch name. If `local`, uses local code without pulling from remote. | `local`
-| `--model` |	Model name to train (`gpn`, `gpn-msa`) or `both` for both models. | `both`
+|`--branch <branch>`|	Git branch to pull before execution. Use `local` to skip Git operations and run local code.|	`local`|
+|`--model <names...>`	|One or more model names to train (`gpn`, `gpn-msa`). Use multiple values (space-separated) or `both` to include all models. If used without arguments, defaults to both models.	|`both`|
+|`--data-loader`|	Include or run only the data-loader pipeline module. Can be combined with `--model`.|	`false` (auto-enabled when no args provided)|
 
 ### What Happens Internally
 
@@ -45,24 +51,51 @@ Pulls the specified branch from remote (`git fetch`, `git checkout`, `git pull`)
 
 Skips pulling if you pass `local`
 
-2️⃣ Model Selection
+2️⃣ Run Target Selection
 
-Trains one or both models as defined in dir `configs`
+The launcher determines what to run — this can include one or more models and optional auxiliary modules
+(such as the `data-loader`) depending on the command-line arguments.
 
-Automatically updates the container run configuration file in `configs`:
+If no arguments are provided, all available run targets are executed by default
+(including both models and the data-loader module).
+
+If `--model` is specified, only those listed models are selected (`gpn`, `gpn-msa`, or both).
+
+If `--data-loader` is specified, the data-loading pipeline is added to the run sequence or executed alone.
+
+Each selected target automatically generates its own container configuration file in the `configs/` directory:
+
+Automatically generated configuration files:
 ```bash
 configs/container_run_gpn.txt
 configs/container_run_gpn-msa.txt
+configs/container_run_data-loader.txt
 ```
+These configuration files act as execution manifests, defining which Python entry point the container should run.
+
+They are not regenerated automatically — instead, the launcher dynamically detects and uses the ones already present.
 
 3️⃣ Container Configuration
 
-The file `container_run_*.txt` is cleared and regenerated for each job:
+The launcher scans the `configs/` directory to collect all matching configuration files
+(based on the selected run targets from Step 2).
+
+For each detected configuration file:
+
+The script reads its content to determine the corresponding Python entry script (e.g., inside src/).
+
+A dedicated PBS job is created and submitted for that entry.
+
+Example mapping between config and execution file:
 ```bash
 src/gpn_test.py
 src/gpn-msa_test.py
 ```
-These files act as the Python entry points for Apptainer container execution.
+Each configuration file is passed to `Katana` as the environment variable `RUNCONF`,
+ensuring the Apptainer container knows which Python script to execute.
+
+This design allows you to easily control which jobs are launched —
+simply add or remove configuration files under `configs/`, and the launcher will automatically detect them.
 
 4️⃣ PBS Job Submission
 
