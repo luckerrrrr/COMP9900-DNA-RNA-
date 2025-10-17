@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# GPN (Genomic Pre-training Network) Preprocessing Pipeline
+# Purpose: Process GENCODE annotations and FASTA sequences for GPN model training
+# Usage: python preprocess.py test  OR  python preprocess.py full [max_exons] [max_promoters]
+
 import pandas as pd
 import numpy as np
 import random
@@ -11,24 +15,29 @@ warnings.filterwarnings('ignore')
 
 
 class GENCODEPreprocessor:
-    """GENCODE data preprocessor for GPN model (PNAS 2023)"""
+    # GENCODE data preprocessor - extracts promoter regions (80%) and exon boundaries (20%)
     
     def __init__(self, gtf_path: str, fasta_path: str):
+        # Initialize preprocessor with GTF annotation file and FASTA sequence file
+        # Args: gtf_path (GENCODE GTF file), fasta_path (genome FASTA file)
         self.gtf_path = Path(gtf_path)
         self.fasta_path = Path(fasta_path)
         
+        # Check if files exist
         if not self.gtf_path.exists():
             raise FileNotFoundError(f"GTF file not found: {self.gtf_path}")
         if not self.fasta_path.exists():
             raise FileNotFoundError(f"FASTA file not found: {self.fasta_path}")
     
     def parse_gtf(self) -> pd.DataFrame:
-        """Parse GTF file and extract gene annotation information"""
+        # Parse GTF file and return as pandas DataFrame
         print(f"Parsing GTF file: {self.gtf_path}")
         
+        # Standard GTF 9-column format
         gtf_columns = ["chr", "source", "feature", "start", "end", 
                       "score", "strand", "frame", "attribute"]
         
+        # Read GTF file, skip comment lines
         gtf = pd.read_csv(self.gtf_path, sep="\t", comment="#", 
                          header=None, names=gtf_columns)
         
@@ -37,15 +46,17 @@ class GENCODEPreprocessor:
     
     def extract_exons_with_flanking(self, gtf_df: pd.DataFrame, 
                                   flanking_size: int = 100) -> List[Dict]:
-        """Extract exons with flanking introns (GPN requirement)"""
+        # Extract exons with flanking introns (20% of GPN training data)
+        # Args: gtf_df (parsed GTF DataFrame), flanking_size (bp to add on each side, default 100)
+        # Returns: List of dictionaries containing exon regions with flanking sequences
         print(f"Extracting exons with {flanking_size}bp flanking introns...")
         
-        # Filter exon features
+        # Filter exon features only
         exons = gtf_df[gtf_df["feature"] == "exon"].copy()
         
         exon_regions = []
         for _, row in exons.iterrows():
-            # Parse attribute field
+            # Parse attribute field to extract gene and transcript IDs
             gene_id = None
             transcript_id = None
             
@@ -56,8 +67,8 @@ class GENCODEPreprocessor:
                     transcript_id = attr.split('"')[1] if '"' in attr else attr.split()[1]
             
             if gene_id and transcript_id:
-                # Add flanking regions
-                start_with_flank = max(1, row['start'] - flanking_size)
+                # Add flanking regions to both sides (default 100bp)
+                start_with_flank = max(1, row['start'] - flanking_size)  # Ensure >= 1
                 end_with_flank = row['end'] + flanking_size
                 
                 exon_regions.append({
@@ -67,7 +78,7 @@ class GENCODEPreprocessor:
                     'start': start_with_flank,
                     'end': end_with_flank,
                     'strand': row['strand'],
-                    'exon_start': row['start'],
+                    'exon_start': row['start'],  # Keep original exon boundaries
                     'exon_end': row['end'],
                     'flanking_size': flanking_size,
                     'region_type': 'exon_with_flanking'
@@ -78,14 +89,17 @@ class GENCODEPreprocessor:
     
     def extract_promoter_regions(self, gtf_df: pd.DataFrame, 
                                promoter_size: int = 1000) -> List[Dict]:
-        """Extract promoter regions (TSS upstream 1000bp, GPN requirement)"""
+        # Extract promoter regions upstream of TSS (80% of GPN training data)
+        # Args: gtf_df (parsed GTF DataFrame), promoter_size (bp upstream of TSS, default 1000)
+        # Returns: List of dictionaries containing promoter regions
         print(f"Extracting promoter regions ({promoter_size}bp upstream of TSS)...")
         
-        # Filter gene features
+        # Filter gene features only
         genes = gtf_df[gtf_df["feature"] == "gene"].copy()
         
         promoter_regions = []
         for _, row in genes.iterrows():
+            # Parse gene ID and gene name from attributes
             gene_id = None
             gene_name = None
             
@@ -96,17 +110,17 @@ class GENCODEPreprocessor:
                     gene_name = attr.split('"')[1] if '"' in attr else attr.split()[1]
             
             if gene_id:
-                # Determine TSS based on strand
+                # Determine TSS (Transcription Start Site) based on strand orientation
                 if row['strand'] == '+':
-                    tss = row['start']
+                    tss = row['start']  # Positive strand: TSS at gene start
                     promoter_start = max(1, tss - promoter_size)
                     promoter_end = tss - 1
                 else:  # strand == '-'
-                    tss = row['end']
+                    tss = row['end']  # Negative strand: TSS at gene end
                     promoter_start = tss + 1
                     promoter_end = tss + promoter_size
                 
-                # Only add if promoter region is valid
+                # Only add valid promoter regions
                 if promoter_end > promoter_start:
                     promoter_regions.append({
                         'gene_id': gene_id,
@@ -123,52 +137,22 @@ class GENCODEPreprocessor:
         print(f"Found {len(promoter_regions)} promoter regions")
         return promoter_regions
     
-    def generate_random_genome_windows(self, num_windows: int, 
-                                     window_size: int = 512) -> List[Dict]:
-        """Generate random genome windows (GPN requirement: equal amount)"""
-        print(f"Generating {num_windows} random genome windows...")
-        
-        # Human genome sizes (approximate)
-        genome_sizes = {
-            'chr1': 248956422, 'chr2': 242193529, 'chr3': 198295559,
-            'chr4': 190214555, 'chr5': 181538259, 'chr6': 170805979,
-            'chr7': 159345973, 'chr8': 145138636, 'chr9': 138394717,
-            'chr10': 133797422, 'chr11': 135086622, 'chr12': 133275309,
-            'chr13': 114364328, 'chr14': 107043718, 'chr15': 101991189,
-            'chr16': 90338345, 'chr17': 83257441, 'chr18': 80373285,
-            'chr19': 58617616, 'chr20': 64444167, 'chr21': 46709983,
-            'chr22': 50818468, 'chrX': 156040895, 'chrY': 57227415
-        }
-        
-        random_windows = []
-        for _ in range(num_windows):
-            # Randomly select chromosome
-            chrom = random.choice(list(genome_sizes.keys()))
-            max_start = genome_sizes[chrom] - window_size
-            
-            # Random start position
-            start = random.randint(1, max_start)
-            end = start + window_size - 1
-            
-            random_windows.append({
-                'chr': chrom,
-                'start': start,
-                'end': end,
-                'window_size': window_size,
-                'region_type': 'random_genome'
-            })
-        
-        print(f"Generated {len(random_windows)} random genome windows")
-        return random_windows
+    # Note: Removed generate_random_genome_windows function
+    # GPN preprocessing only requires two region types:
+    # 1. Promoter regions (80% of training data)
+    # 2. Exon boundaries with flanking (20% of training data)
     
     def create_gpn_windows(self, regions: List[Dict], 
                           window_size: int = 512, step_size: int = 256) -> List[Dict]:
-        """Create 512bp sliding windows with 256bp step (GPN requirement)"""
+        # Create 512bp sliding windows with 256bp step (50% overlap)
+        # Args: regions (list of genomic regions), window_size (default 512bp), step_size (default 256bp)
+        # Returns: List of 512bp windows
         windows = []
         
         for region in regions:
             current_start = region['start']
             
+            # Slide window with step_size (256bp)
             while current_start + window_size <= region['end']:
                 window = {
                     'chr': region['chr'],
@@ -181,12 +165,14 @@ class GENCODEPreprocessor:
                     'strand': region.get('strand', '+')
                 }
                 windows.append(window)
-                current_start += step_size
+                current_start += step_size  # Move to next window
         
         return windows
     
     def load_sequence_from_fasta(self, chrom: str, start: int, end: int) -> Optional[str]:
-        """Load DNA sequence from FASTA file"""
+        # Load DNA sequence from FASTA file for specified genomic region
+        # Args: chrom (chromosome name), start (1-based start position), end (1-based end position)
+        # Returns: DNA sequence string or None if loading fails
         try:
             print(f"    Loading sequence for {chrom}:{start}-{end}")
             
@@ -197,6 +183,7 @@ class GENCODEPreprocessor:
             sequence = ""
             in_target_chrom = False
             
+            # Parse FASTA file
             for line in lines:
                 line = line.strip()
                 if line.startswith('>'):
@@ -207,7 +194,7 @@ class GENCODEPreprocessor:
                     else:
                         in_target_chrom = False
                 elif in_target_chrom and line and not line.startswith('>'):
-                    sequence += line.upper()
+                    sequence += line.upper()  # Convert to uppercase
             
             print(f"    Total sequence length: {len(sequence)}")
             
@@ -228,21 +215,26 @@ class GENCODEPreprocessor:
 
 
 class GPNDataProcessor:
-    """GPN model data processor"""
+    # GPN model data processor - handles augmentation and masking
     
     def __init__(self):
+        # Initialize complement mapping for reverse complement generation
         self.complement_map = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C', 'N': 'N'}
     
     def reverse_complement(self, sequence: str) -> str:
-        """Generate reverse complement sequence (GPN data augmentation)"""
+        # Generate reverse complement sequence (GPN data augmentation requirement)
+        # Returns: Reverse complement of input sequence
         return ''.join([self.complement_map.get(base, base) for base in sequence[::-1]])
     
     def tokenize_sequence(self, sequence: str) -> List[str]:
-        """Tokenize sequence into single nucleotides (GPN requirement: non k-mer)"""
+        # Tokenize sequence into single nucleotides (GPN requirement: non k-mer tokenization)
+        # Returns: List of individual nucleotides
         return list(sequence)
     
     def apply_data_augmentation(self, sequence: str, apply_reverse_complement: bool = True) -> List[str]:
-        """Apply data augmentation: reverse complement (GPN requirement)"""
+        # Apply data augmentation by generating reverse complement (2x data increase)
+        # Args: sequence (DNA sequence), apply_reverse_complement (whether to generate rev comp)
+        # Returns: List containing original and reverse complement sequences
         sequences = [sequence]
         
         if apply_reverse_complement:
@@ -252,7 +244,9 @@ class GPNDataProcessor:
         return sequences
     
     def mask_sequence(self, sequence: str, mask_ratio: float = 0.15) -> Tuple[str, List[int]]:
-        """Apply 15% masking (GPN requirement)"""
+        # Apply random masking to 15% of sequence positions (GPN pre-training requirement)
+        # Args: sequence (DNA sequence), mask_ratio (default 0.15 = 15%)
+        # Returns: Tuple of (masked sequence, list of masked positions)
         seq_list = list(sequence)
         seq_len = len(seq_list)
         num_mask = int(seq_len * mask_ratio)
@@ -260,7 +254,7 @@ class GPNDataProcessor:
         # Randomly select positions to mask
         mask_positions = random.sample(range(seq_len), num_mask)
         
-        # Apply masking
+        # Apply masking by replacing with [MASK] token
         for pos in mask_positions:
             seq_list[pos] = '[MASK]'
         
@@ -269,9 +263,11 @@ class GPNDataProcessor:
 
 def process_gpn_dataset(gtf_path: str, fasta_path: str, 
                        max_exons: int = 1000, max_promoters: int = 1000,
-                       random_windows: int = 1000,
                        output_path: str = "data/gpn_preprocessing_results.json") -> List[Dict]:
-    """Full GPN preprocessing pipeline following PNAS 2023 requirements"""
+    # Full GPN preprocessing pipeline following PNAS 2023 paper requirements
+    # Args: gtf_path (GTF file), fasta_path (FASTA file), max_exons (max exon regions),
+    #       max_promoters (max promoter regions), output_path (output JSON file)
+    # Returns: List of processed sequences with augmentation and masking
     
     print("=" * 80)
     print("GPN PREPROCESSING PIPELINE (PNAS 2023)")
@@ -281,9 +277,9 @@ def process_gpn_dataset(gtf_path: str, fasta_path: str,
     print(f"  - FASTA file: {fasta_path}")
     print(f"  - Max exons: {max_exons}")
     print(f"  - Max promoters: {max_promoters}")
-    print(f"  - Random windows: {random_windows}")
     print(f"  - Window size: 512bp (GPN requirement)")
     print(f"  - Step size: 256bp (50% overlap)")
+    print(f"  - Region types: Promoter (80%) + Exon boundaries (20%)")
     print("=" * 80)
     
     try:
@@ -299,35 +295,29 @@ def process_gpn_dataset(gtf_path: str, fasta_path: str,
         # Extract regions following GPN requirements
         print("\n[STEP 3] Extracting regions...")
         
-        # 1. Exons with flanking introns
+        # 1. Exons with flanking introns (20% of training data)
         exon_regions = gencode_processor.extract_exons_with_flanking(gtf_df, flanking_size=100)
         exon_regions = exon_regions[:max_exons]
         
-        # 2. Promoter regions (TSS upstream 1000bp)
+        # 2. Promoter regions (80% of training data)
         promoter_regions = gencode_processor.extract_promoter_regions(gtf_df, promoter_size=1000)
         promoter_regions = promoter_regions[:max_promoters]
         
-        # 3. Random genome windows (equal amount)
-        random_regions = gencode_processor.generate_random_genome_windows(random_windows, window_size=512)
-        
         print(f"  - Exon regions: {len(exon_regions)}")
         print(f"  - Promoter regions: {len(promoter_regions)}")
-        print(f"  - Random regions: {len(random_regions)}")
+        print(f"  - Total regions: {len(exon_regions) + len(promoter_regions)}")
         
         # Create windows
         print("\n[STEP 4] Creating 512bp windows...")
         all_windows = []
         
-        # Windows from exons
+        # Windows from exons (20% of training data)
         exon_windows = gencode_processor.create_gpn_windows(exon_regions, window_size=512, step_size=256)
         all_windows.extend(exon_windows)
         
-        # Windows from promoters
+        # Windows from promoters (80% of training data)
         promoter_windows = gencode_processor.create_gpn_windows(promoter_regions, window_size=512, step_size=256)
         all_windows.extend(promoter_windows)
-        
-        # Random windows (already 512bp)
-        all_windows.extend(random_regions)
         
         print(f"  Total windows created: {len(all_windows)}")
         
@@ -432,8 +422,8 @@ def test_gpn_preprocessing():
     print("Testing GPN preprocessing pipeline")
     print("=" * 50)
     
-    gtf_path = "data/Dark Matter of the Genome data/gencode.v38.basic.annotation.gtf"
-    fasta_path = "data/Dark Matter of the Genome data/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
+    gtf_path = "dataset/gencode.v38.basic.annotation.gtf"
+    fasta_path = "dataset/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
     
     if not Path(gtf_path).exists():
         print(f"GTF file not found: {gtf_path}")
@@ -447,8 +437,7 @@ def test_gpn_preprocessing():
             gtf_path=gtf_path,
             fasta_path=fasta_path,
             max_exons=10,
-            max_promoters=10,
-            random_windows=10
+            max_promoters=10
         )
         
         if results:
@@ -477,19 +466,17 @@ if __name__ == "__main__":
     elif mode == "full":
         print("Running GPN preprocessing in FULL mode...")
         
-        gtf_path = "data/Dark Matter of the Genome data/gencode.v38.basic.annotation.gtf"
-        fasta_path = "data/Dark Matter of the Genome data/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
+        gtf_path = "dataset/gencode.v38.basic.annotation.gtf"
+        fasta_path = "dataset/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
         
         max_exons = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
         max_promoters = int(sys.argv[3]) if len(sys.argv) > 3 else 1000
-        random_windows = int(sys.argv[4]) if len(sys.argv) > 4 else 1000
         
         results = process_gpn_dataset(
             gtf_path=gtf_path,
             fasta_path=fasta_path,
             max_exons=max_exons,
-            max_promoters=max_promoters,
-            random_windows=random_windows
+            max_promoters=max_promoters
         )
         
         if results:
@@ -501,6 +488,6 @@ if __name__ == "__main__":
     else:
         print(f"Unknown mode: {mode}")
         print("Usage:")
-        print("  python preprocess_gpn.py test                           # Quick test")
-        print("  python preprocess_gpn.py full [exons] [promoters] [random]  # Full processing")
-        print("  python preprocess_gpn.py full 1000 1000 1000            # Process 1000 of each type")
+        print("  python preprocess.py test                           # Quick test")
+        print("  python preprocess.py full [exons] [promoters]       # Full processing")
+        print("  python preprocess.py full 1000 1000                 # Process 1000 of each type")

@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Genome Data Loader for GPN Models
+# Purpose: Unified loader for GPN models and genomic datasets from Hugging Face
+# Features: Model loading (gpn-brassicales, gpn-msa-sapiens), Dataset loading (Brassicales, MSA-Sapiens, Multiz100way)
+# Usage: loader = GenomeLoader(); model = loader.load_gpn_brassicales_model(); dataset = loader.load_brassicales_dataset()
+
 from pathlib import Path
 from transformers import AutoModelForMaskedLM, AutoModel
 import gpn.model  # Register custom models
@@ -9,51 +14,60 @@ from datasets import load_dataset
 
 
 # Dataset and model name constants
-DATASET_BRASSICALES = "songlab/genomes-brassicales-balanced-v1"
-DATASET_MSA_SAPIENS = "songlab/gpn-msa-sapiens-dataset"
-DATASET_MULTIZ100WAY = "songlab/multiz100way"
+# These constants define the Hugging Face model and dataset identifiers
+DATASET_BRASSICALES = "songlab/genomes-brassicales-balanced-v1"  # Plant genome sequences
+DATASET_MSA_SAPIENS = "songlab/gpn-msa-sapiens-dataset"         # Human + 89 vertebrate alignment
+DATASET_MULTIZ100WAY = "songlab/multiz100way"                   # 100-species vertebrate alignment
 
-MODEL_GPN_BRASSICALES = "gpn-brassicales"
-MODEL_GPN_MSA_SAPIENS = "gpn-msa-sapiens"
+MODEL_GPN_BRASSICALES = "gpn-brassicales"  # Plant genome pre-trained model
+MODEL_GPN_MSA_SAPIENS = "gpn-msa-sapiens"  # Human genome pre-trained model
 
 
 class GenomeLoader:
-    # Unified loader for genomic models and datasets
+    # Unified loader for genomic models and datasets with automatic caching
     
     def __init__(self, cache_dir="cache", data_dir="data"):
+        # Initialize loader with cache directories
+        # Args: cache_dir (models/datasets cache), data_dir (local data files)
         self.cache_dir = Path(cache_dir)
         self.data_dir = Path(data_dir)
         self.datasets_cache_dir = self.cache_dir / "datasets"
-        self.models = {}
-        self.masked_models = {}
+        self.models = {}  # Cache for unmasked models
+        self.masked_models = {}  # Cache for masked models
         
-        # Create directories
+        # Create directories if they don't exist
         self.cache_dir.mkdir(exist_ok=True)
         self.datasets_cache_dir.mkdir(exist_ok=True)
         self.data_dir.mkdir(exist_ok=True)
         
-        # Set Hugging Face cache directories
+        # Set Hugging Face cache directories for automatic caching
         os.environ['HF_DATASETS_CACHE'] = str(self.datasets_cache_dir)
         os.environ['HF_HOME'] = str(self.cache_dir)
     
     # Model loading methods
     
     def load_model(self, model_name, masked=True):
+        # Load GPN model from Hugging Face with caching
+        # Args: model_name (gpn-brassicales or gpn-msa-sapiens), masked (True for masked LM, False for base model)
+        # Returns: Loaded transformers model
         model_list = self.models if not masked else self.masked_models
-        # Load GPN model from Hugging Face
+        
+        # Check if model is already cached in memory
         if model_name in model_list:
             print(f"Using cached {model_name} model")
             return model_list[model_name]
         
         print(f"Loading {model_name} model...")
         try:
+            # Select model class based on masked parameter
             preTrainAutoModel = AutoModelForMaskedLM if masked else AutoModel
+            # Load from Hugging Face Hub with local caching
             model = preTrainAutoModel.from_pretrained(
                 f"songlab/{model_name}",
                 cache_dir=str(self.cache_dir),
-                trust_remote_code=True
+                trust_remote_code=True  # Required for custom GPN architectures
             )
-            model_list[model_name] = model
+            model_list[model_name] = model  # Cache in memory
             print(f"{model_name} model loaded successfully!")
             return model
         except Exception as e:
@@ -61,9 +75,13 @@ class GenomeLoader:
             raise
     
     def load_gpn_brassicales_model(self, masked=True):
+        # Load GPN-Brassicales plant genome model
+        # Args: masked (True for masked LM variant)
         return self.load_model(MODEL_GPN_BRASSICALES, masked)
     
     def load_gpn_msa_sapiens_model(self, masked=True):
+        # Load GPN-MSA-Sapiens human genome model
+        # Args: masked (True for masked LM variant)
         return self.load_model(MODEL_GPN_MSA_SAPIENS, masked)
     
     # Dataset loading methods
@@ -129,10 +147,10 @@ class GenomeLoader:
     
     def load_dark_matter_data(self):
         # Load local Dark Matter of the Genome dataset
-        dark_matter_dir = self.data_dir / "Dark Matter of the Genome data"
+        dark_matter_dir = Path("dataset")
         
         if not dark_matter_dir.exists():
-            print("Dark Matter data folder not found")
+            print("Dataset folder not found")
             return None
         
         files = {
@@ -154,7 +172,7 @@ class GenomeLoader:
     
     def get_info(self):
         # Get information about loaded models and cached datasets
-        dark_matter_dir = self.data_dir / "Dark Matter of the Genome data"
+        dark_matter_dir = Path("dataset")
         
         datasets_available = self.datasets_cache_dir.exists() and any(self.datasets_cache_dir.iterdir())
         cached_datasets = []
