@@ -31,6 +31,7 @@ chmod +x ./train_launcher.sh
 | `./train_launcher.sh --model gpn gpn-msa` | Train both GPN and GPN-MSA models explicitly. |
 | `./train_launcher.sh --model` |	Shortcut: Run both models (GPN + GPN-MSA), exclude data-loader. |
 |`./train_launcher.sh --data-loader`	| Run only the data-loader module. |
+|`./train_launcher.sh --data-preprocess`	| Run only the data-preproccess module. |
 | `./train_launcher.sh --model gpn --data-loader` |	Run GPN model and data-loader together. |
 | `./train_launcher.sh --branch dev --model gpn-msa` |	Pull branch `dev` and train only GPN-MSA model. |
 | `./train_launcher.sh --branch main --model both` |	Pull branch `main` and train both models (equivalent to `--model gpn gpn-msa`). |
@@ -42,6 +43,7 @@ chmod +x ./train_launcher.sh
 |`--branch <branch>`|	Git branch to pull before execution. Use `local` to skip Git operations and run local code.|	`local`|
 |`--model <names...>`	|One or more model names to train (`gpn`, `gpn-msa`). Use multiple values (space-separated) or `both` to include all models. If used without arguments, defaults to both models.	|`both`|
 |`--data-loader`|	Include or run only the data-loader pipeline module. Can be combined with `--model`.|	`false` (auto-enabled when no args provided)|
+|`--data-preprocess`|	Include or run only the data-preprocess pipeline module. Can be combined with `--model`.|	`false` (auto-enabled when no args provided)|
 
 ### What Happens Internally
 
@@ -54,7 +56,7 @@ Skips pulling if you pass `local`
 2️⃣ Run Target Selection
 
 The launcher determines what to run — this can include one or more models and optional auxiliary modules
-(such as the `data-loader`) depending on the command-line arguments.
+(such as the `data-loader, data-preprocess`) depending on the command-line arguments.
 
 If no arguments are provided, all available run targets are executed by default
 (including both models and the data-loader module).
@@ -63,6 +65,8 @@ If `--model` is specified, only those listed models are selected (`gpn`, `gpn-ms
 
 If `--data-loader` is specified, the data-loading pipeline is added to the run sequence or executed alone.
 
+If `--data-preprocess` is specified, the data-preprocessing pipeline is added to the run sequence or executed alone.
+
 Each selected target automatically generates its own container configuration file in the `configs/` directory:
 
 Automatically generated configuration files:
@@ -70,6 +74,7 @@ Automatically generated configuration files:
 configs/container_run_gpn.txt
 configs/container_run_gpn-msa.txt
 configs/container_run_data-loader.txt
+configs/container_run_data-preprocess.txt
 ```
 These configuration files act as execution manifests, defining which Python entry point the container should run.
 

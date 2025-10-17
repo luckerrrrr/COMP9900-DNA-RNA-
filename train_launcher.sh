@@ -23,6 +23,7 @@ PBS_SCRIPT="./run.pbs"
 BRANCH="local"
 declare -a MODELS_TO_RUN=()  # dynamic list of models
 INCLUDE_DATA_LOADER=false
+INCLUDE_DATA_PREPROCESS=false
 
 # ---------- Parse Command-line Arguments ----------
 while [[ $# -gt 0 ]]; do
@@ -49,16 +50,20 @@ while [[ $# -gt 0 ]]; do
       INCLUDE_DATA_LOADER=true
       shift
       ;;
+    --data-preprocess)
+      INCLUDE_DATA_PREPROCESS=true
+      shift
+      ;;
     *)
       echo "❌ Unknown argument: $1"
-      echo "Usage: $0 [--branch <branch>] [--model <m1> <m2> ...] [--data-loader]"
+      echo "Usage: $0 [--branch <branch>] [--model <m1> <m2> ...] [--data-loader] [--data-preprocess]"
       exit 1
       ;;
   esac
 done
 
 # ---------- Auto-enable data-loader when no args ----------
-if [[ ${#MODELS_TO_RUN[@]} -eq 0 && "$INCLUDE_DATA_LOADER" == false ]]; then
+if [[ ${#MODELS_TO_RUN[@]} -eq 0 && "$INCLUDE_DATA_LOADER" == false && "$INCLUDE_DATA_PREPROCESS" == false ]]; then
   echo ""
   echo "[INFO] No specific model or flags provided → defaulting to ALL (including data-loader)"
   INCLUDE_DATA_LOADER=true
@@ -76,6 +81,7 @@ echo "[INFO] Katana launcher started"
 echo "[INFO] Branch : $BRANCH"
 echo "[INFO] Models : ${MODELS_TO_RUN[*]:-(all)}"
 echo "[INFO] Data-loader : $INCLUDE_DATA_LOADER"
+echo "[INFO] Data-preprocess : $INCLUDE_DATA_PREPROCESS"
 echo "[INFO] Log    : $LAUNCH_LOG"
 echo "=============================="
 echo ""
@@ -98,7 +104,7 @@ mkdir -p "$CONFIG_DIR"
 declare -a CONFIG_FILES
 
 # Case 1️⃣: If no models given → run all configs
-if [[ ${#MODELS_TO_RUN[@]} -eq 0 && "$INCLUDE_DATA_LOADER" == false ]]; then
+if [[ ${#MODELS_TO_RUN[@]} -eq 0 && "$INCLUDE_DATA_LOADER" == false && "$INCLUDE_DATA_PREPROCESS" == false ]]; then
   echo "[SCAN] No specific models provided → running all container_run_*.txt"
   mapfile -t CONFIG_FILES < <(find "$CONFIG_DIR" -maxdepth 1 -type f -name "container_run_*.txt" | sort)
 else
@@ -122,6 +128,15 @@ else
       CONFIG_FILES+=("$DL_CONFIG")
     else
       echo "⚠️  Warning: Data-loader config not found ($DL_CONFIG)"
+    fi
+  fi
+
+  if [[ "$INCLUDE_DATA_PREPROCESS" == true ]]; then
+    DL_CONFIG="$CONFIG_DIR/container_run_data-preprocess.txt"
+    if [[ -f "$DL_CONFIG" ]]; then
+      CONFIG_FILES+=("$DL_CONFIG")
+    else
+      echo "⚠️  Warning: Data-preprocess config not found ($DL_CONFIG)"
     fi
   fi
 fi
