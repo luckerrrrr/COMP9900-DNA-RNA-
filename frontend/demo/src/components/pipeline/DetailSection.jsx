@@ -3,6 +3,7 @@ import { STEP_DESCRIPTIONS } from "../../constants/pipelineSteps";
 import DataAnimation from "./animations/DataAnimation"; 
 import MSAAnimation from "./animations/MSAAnimation";
 import TokenAnimation from "./animations/TokenAnimation";
+import EmbedAnimation from "./animations/EmbedAnimation";
 
 export default function DetailSection({ activeStep, steps }) {
   const currentStep = steps[activeStep - 1];
@@ -47,6 +48,7 @@ export default function DetailSection({ activeStep, steps }) {
         {activeStep === 1 && <DataAnimation />}
         {activeStep === 2 && <MSAAnimation />}
         {activeStep === 3 && <TokenAnimation />}
+        {activeStep === 4 && <EmbedAnimation />}
       </div>
 
       <div style={{ color: "rgba(255, 255, 255, 0.7)", lineHeight: 1.8 }}>
