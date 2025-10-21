@@ -1,23 +1,42 @@
-import React from "react";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import StepCards from "../components/pipeline/StepCards";
+import DetailSection from "../components/pipeline/DetailSection";
+import { PIPELINE_STEPS } from "../constants/pipelineSteps";
 
 export default function Module2Pipeline() {
-  const steps = ["Data Preprocessing", "MSA Alignment", "Tokenisation", "Embedding", "Prediction", "Evaluation"];
+  const [activeStep, setActiveStep] = useState(1);
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true, amount: 0.5 }}
-      style={{ padding: "50px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%" }}
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: "5%",
+        color: "#fff",
+      }}
     >
-      <h2>Pipeline Overview</h2>
-      <div style={{ display: "flex", gap: "20px", marginTop: "30px" }}>
-        {steps.map((s, i) => (
-          <motion.div key={i} whileHover={{ scale: 1.1 }} style={{ padding: "20px", border: "1px solid gray", borderRadius: "8px" }}>
-            {s}
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
+      {/* Title */}
+      <motion.h2
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{
+          textAlign: "center",
+          fontSize: "clamp(32px, 5vw, 48px)",
+          marginBottom: "60px",
+        }}
+      >
+        🧬 Data Processing Pipeline
+      </motion.h2>
+
+      {/* Step Cards */}
+      <StepCards
+        steps={PIPELINE_STEPS}
+        activeStep={activeStep}
+        onStepClick={setActiveStep}
+      />
+
+      {/* Detail Section */}
+      <DetailSection activeStep={activeStep} steps={PIPELINE_STEPS} />
+    </div>
   );
 }
