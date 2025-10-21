@@ -1,11 +1,20 @@
+import {
+  FaBroom,
+  FaDna,
+  FaFont,
+  FaBrain,
+  FaBullseye,
+  FaChartLine,
+} from "react-icons/fa";
+
 // Pipeline steps configuration
 export const PIPELINE_STEPS = [
-  { id: 1, title: "Data", subtitle: "Preprocessing", icon: "📊" },
-  { id: 2, title: "MSA", subtitle: "Alignment", icon: "🧬" },
-  { id: 3, title: "Token", subtitle: "Encoding", icon: "🔢" },
-  { id: 4, title: "Embed", subtitle: "Vectors", icon: "📈" },
-  { id: 5, title: "Predict", subtitle: "Model", icon: "🎯" },
-  { id: 6, title: "Eval", subtitle: "Results", icon: "✅" },
+  { id: 1, title: "Data", subtitle: "Preprocessing", icon: <FaBroom /> },
+  { id: 2, title: "MSA", subtitle: "Alignment", icon: <FaDna /> },
+  { id: 3, title: "Tokenisation", subtitle: "Encoding", icon: <FaFont /> },
+  { id: 4, title: "Embedding", subtitle: "Representation", icon: <FaBrain /> },
+  { id: 5, title: "Prediction", subtitle: "Recovery", icon: <FaBullseye /> },
+  { id: 6, title: "Evaluation", subtitle: "Analysis", icon: <FaChartLine /> },
 ];
 
 // Step descriptions

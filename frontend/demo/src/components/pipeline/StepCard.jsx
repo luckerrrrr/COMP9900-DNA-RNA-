@@ -28,7 +28,15 @@ export default function StepCard({ step, index, isActive, onClick }) {
         transition: "all 0.3s ease",
       }}
     >
-      <div style={{ fontSize: "36px", marginBottom: "8px" }}>{step.icon}</div>
+      <div
+        style={{
+          fontSize: "36px",
+          marginBottom: "8px",
+          color: isActive ? "#00d4ff" : "rgba(255, 255, 255, 0.6)",
+        }}
+      >
+        {step.icon}
+      </div>
       <div
         style={{
           fontSize: "16px",

@@ -3,6 +3,7 @@ import { useState } from "react";
 import StepCards from "../components/pipeline/StepCards";
 import DetailSection from "../components/pipeline/DetailSection";
 import { PIPELINE_STEPS } from "../constants/pipelineSteps";
+import { SiJfrogpipelines } from "react-icons/si";
 
 export default function Module2Pipeline() {
   const [activeStep, setActiveStep] = useState(1);
@@ -25,7 +26,7 @@ export default function Module2Pipeline() {
           marginBottom: "60px",
         }}
       >
-        🧬 Data Processing Pipeline
+        <SiJfrogpipelines /> Data Processing Pipeline
       </motion.h2>
 
       {/* Step Cards */}
