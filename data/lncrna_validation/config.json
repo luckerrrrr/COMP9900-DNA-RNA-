@@ -1,6 +1,5 @@
 {
-  "gencode_path": "../../dataset/gencode.v44.annotation.gtf",
-  "gpn_msa_path": "../../dataset/gpn_msa_training_data.json",
-  "window_size": 150,
-  "output_dir": "output"
+  "gencode_path": "../../dataset/gencode.v38.basic.annotation.gtf",
+  "sample_size": 10000,
+  "output_dir": "."
 }

@@ -1,485 +1,261 @@
 #!/usr/bin/env python3
-# lncRNA Validation Analysis - Simplified Version
-#
-# This script validates whether GENCODE lncRNA information appears in GPN-MSA training data.
-# Implements both analysis pathways from the project plan.
-#
-# Usage:
-#     python lncrna_analysis.py --gencode gencode.gtf --gpn-msa data.json --output output/
-#     python lncrna_analysis.py --config config.json
-#
-# Author: Capstone Project Team
+# -*- coding: utf-8 -*-
+
+# lncRNA Validation Analysis - UMAP Visualization
+# Purpose: Validate GENCODE lncRNA information in GPN-MSA training data
+# Usage: python lncrna_analysis.py
 
 import os
 import sys
 import json
 import argparse
-import logging
-from collections import Counter, defaultdict
+from pathlib import Path
+from collections import Counter
 from typing import List, Dict, Tuple, Optional
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-class GenomicRegion:
-    # Represents a genomic region with coordinates and metadata
-    def __init__(self, chrom, start, end, gene_id, gene_name, gene_type, strand='+'):
-        self.chrom = chrom
-        self.start = start
-        self.end = end
-        self.gene_id = gene_id
-        self.gene_name = gene_name
-        self.gene_type = gene_type
-        self.strand = strand
-        
-        if self.start >= self.end:
-            raise ValueError(f"Invalid coordinates: start ({self.start}) >= end ({self.end})")
+class UMAPAnalyzer:
+    # UMAP dimensionality reduction analyzer for GPN-MSA data with GENCODE labels
     
-    def overlaps(self, other):
-        # Check if this region overlaps with another region
-        if self.chrom != other.chrom:
-            return False
-        return not (self.end <= other.start or other.end <= self.start)
-
-class TrainingWindow:
-    # Represents a GPN-MSA training window
-    def __init__(self, chrom, start, end, window_id, sequence=None, label=None, embedding=None):
-        self.chrom = chrom
-        self.start = start
-        self.end = end
-        self.window_id = window_id
-        self.sequence = sequence
-        self.label = label
-        self.embedding = embedding
-        
-        if self.start >= self.end:
-            raise ValueError(f"Invalid coordinates: start ({self.start}) >= end ({self.end})")
-
-class lncRNAAnalyzer:
-    # Main analyzer class for lncRNA validation
-    
-    def __init__(self, gencode_path, gpn_msa_path, output_dir="output"):
+    def __init__(self, gencode_path: str, output_dir: str = "."):
         self.gencode_path = gencode_path
-        self.gpn_msa_path = gpn_msa_path
-        self.output_dir = output_dir
-        
-        # Create output directory
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Data storage
-        self.gencode_regions = []
-        self.lncrna_regions = []
-        self.training_windows = []
-        self.intersections = []
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(exist_ok=True)
     
-    def parse_gencode_gtf(self):
-        # Parse GENCODE GTF file and extract gene regions
-        logger.info(f"Parsing GENCODE GTF: {self.gencode_path}")
-        
-        regions = []
-        with open(self.gencode_path, 'r') as f:
-            for line_num, line in enumerate(f, 1):
-                if line.startswith('#'):
-                    continue
-                
-                try:
-                    region = self._parse_gtf_line(line.strip())
-                    if region:
-                        regions.append(region)
-                except Exception as e:
-                    logger.warning(f"Error parsing line {line_num}: {e}")
-                    continue
-        
-        self.gencode_regions = regions
-        self.lncrna_regions = [r for r in regions if 'lncRNA' in r.gene_type.lower()]
-        
-        logger.info(f"Parsed {len(regions)} total regions, {len(self.lncrna_regions)} lncRNA regions")
-        return regions
-    
-    def _parse_gtf_line(self, line):
-        # Parse a single GTF line
-        fields = line.split('\t')
-        if len(fields) < 9 or fields[2] != 'gene':
-            return None
-        
-        chrom = fields[0]
-        start = int(fields[3]) - 1  # Convert to 0-based
-        end = int(fields[4])
-        strand = fields[6]
-        
-        # Parse attributes
-        attributes = {}
-        for attr in fields[8].split(';'):
-            attr = attr.strip()
-            if ' ' in attr:
-                key, value = attr.split(' ', 1)
-                value = value.strip('"')
-                attributes[key] = value
-        
-        return GenomicRegion(
-            chrom=chrom,
-            start=start,
-            end=end,
-            gene_id=attributes.get('gene_id', 'unknown'),
-            gene_name=attributes.get('gene_name', 'unknown'),
-            gene_type=attributes.get('gene_type', 'unknown'),
-            strand=strand
-        )
-    
-    def parse_gpn_msa_data(self, window_size=150):
-        # Parse GPN-MSA training data and extract windows
-        logger.info(f"Parsing GPN-MSA data: {self.gpn_msa_path}")
-        
-        windows = []
-        
-        if self.gpn_msa_path.endswith('.json'):
-            windows = self._parse_json_data(window_size)
-        elif self.gpn_msa_path.endswith('.bed'):
-            windows = self._parse_bed_data(window_size)
-        else:
-            logger.warning(f"Unknown data format for {self.gpn_msa_path}")
-        
-        self.training_windows = windows
-        logger.info(f"Parsed {len(windows)} training windows")
-        return windows
-    
-    def _parse_json_data(self, window_size):
-        # Parse JSON format training data
+    def load_gpn_msa_data(self, sample_size: int = 10000):
+        # Load GPN-MSA dataset from Hugging Face
         try:
-            with open(self.gpn_msa_path, 'r') as f:
-                data = json.load(f)
+            from datasets import load_dataset
+            print(f"Loading GPN-MSA dataset (sample size: {sample_size})...")
             
-            windows = []
-            for i, item in enumerate(data):
-                chrom = item.get('chromosome', 'chr1')
-                start = item.get('start', i * window_size)
-                end = start + window_size
-                
-                window = TrainingWindow(
-                    chrom=chrom,
-                    start=start,
-                    end=end,
-                    window_id=f"window_{i}",
-                    sequence=item.get('sequence'),
-                    label=item.get('label'),
-                    embedding=item.get('embedding')
-                )
-                windows.append(window)
+            dataset = load_dataset('songlab/gpn-msa-sapiens-dataset', cache_dir='../../cache/datasets')
+            train_data = dataset['train']
             
-            return windows
+            # Sample data to speed up processing
+            if len(train_data) > sample_size:
+                indices = list(range(0, len(train_data), len(train_data) // sample_size))[:sample_size]
+                sampled_data = [train_data[i] for i in indices]
+            else:
+                sampled_data = list(train_data)
+            
+            print(f"Loaded {len(sampled_data)} samples")
+            return sampled_data
+            
         except Exception as e:
-            logger.error(f"Error parsing JSON data: {e}")
-            return []
+            print(f"Error loading GPN-MSA data: {e}")
+            return None
     
-    def _parse_bed_data(self, window_size):
-        # Parse BED format training data
+    def get_gencode_labels(self, windows):
+        # Get label information from GENCODE GTF file
+        print("Loading GENCODE annotations for labeling...")
+        
         try:
-            windows = []
-            with open(self.gpn_msa_path, 'r') as f:
-                for i, line in enumerate(f):
-                    if line.startswith('#'):
+            gencode_regions = []
+            with open(self.gencode_path, 'r') as f:
+                for line in f:
+                    if line.startswith('#') or not line.strip():
                         continue
                     
-                    fields = line.strip().split('\t')
-                    if len(fields) >= 3:
-                        chrom = fields[0]
-                        start = int(fields[1])
-                        end = int(fields[2])
+                    parts = line.strip().split('\t')
+                    if len(parts) < 9:
+                        continue
+                    
+                    chrom, source, feature, start, end, score, strand, frame, attribute = parts
+                    
+                    if feature == 'gene':
+                        # Parse gene type from attributes
+                        gene_type = 'unknown'
+                        gene_name = 'unknown'
                         
-                        window = TrainingWindow(
-                            chrom=chrom,
-                            start=start,
-                            end=end,
-                            window_id=f"window_{i}",
-                            label=fields[3] if len(fields) > 3 else None
-                        )
-                        windows.append(window)
+                        for attr in attribute.split(';'):
+                            if 'gene_type' in attr:
+                                gene_type = attr.split('"')[1] if '"' in attr else attr.split()[1]
+                            elif 'gene_name' in attr:
+                                gene_name = attr.split('"')[1] if '"' in attr else attr.split()[1]
+                        
+                        gencode_regions.append({
+                            'chrom': chrom,
+                            'start': int(start),
+                            'end': int(end),
+                            'gene_type': gene_type,
+                            'gene_name': gene_name
+                        })
             
-            return windows
+            print(f"Loaded {len(gencode_regions)} GENCODE regions")
+            
+            # Assign labels to each window
+            window_labels = []
+            for window in windows:
+                label = 'intergenic'  # Default label
+                
+                for region in gencode_regions:
+                    if (region['chrom'] == window['chrom'] and 
+                        not (window['end'] <= region['start'] or region['end'] <= window['start'])):
+                        label = region['gene_type']
+                        break
+                
+                window_labels.append(label)
+            
+            return window_labels
+            
         except Exception as e:
-            logger.error(f"Error parsing BED data: {e}")
-            return []
+            print(f"Error loading GENCODE labels: {e}")
+            return ['unknown'] * len(windows)
     
-    def find_intersections(self):
-        # Find intersections between GENCODE regions and training windows
-        logger.info("Finding genomic intersections...")
+    def extract_features(self, windows):
+        # Extract features from GPN-MSA windows using phyloP and phastCons
+        print("Extracting features from GPN-MSA windows...")
         
-        intersections = []
-        for region in self.gencode_regions:
-            for window in self.training_windows:
-                if self._regions_overlap(region, window):
-                    intersections.append((region, window))
+        features = []
+        for window in windows:
+            # Use phyloP and phastCons as features
+            phylop = window.get('phyloP', [])
+            phastcons = window.get('phastCons', [])
+            
+            if phylop and phastcons and len(phylop) > 0 and len(phastcons) > 0:
+                # Calculate statistical features
+                try:
+                    feature_vector = [
+                        sum(phylop) / len(phylop),  # Mean phyloP
+                        max(phylop),                # Max phyloP
+                        min(phylop),                # Min phyloP
+                        sum(phastcons) / len(phastcons),  # Mean phastCons
+                        max(phastcons),             # Max phastCons
+                        min(phastcons),             # Min phastCons
+                        window['start'] % 1000000,  # Genomic position feature
+                    ]
+                    features.append(feature_vector)
+                except (TypeError, ValueError):
+                    # If calculation fails, use default features
+                    features.append([0.0] * 7)
+            else:
+                # If no phyloP/phastCons, use default features
+                features.append([0.0] * 7)
         
-        self.intersections = intersections
-        logger.info(f"Found {len(intersections)} intersections")
-        return intersections
+        return features
     
-    def _regions_overlap(self, region, window):
-        # Check if a genomic region overlaps with a training window
-        if region.chrom != window.chrom:
-            return False
-        return not (region.end <= window.start or window.end <= region.start)
-    
-    def get_lncrna_coverage(self):
-        # Get lncRNA coverage statistics
-        lncrna_intersections = [(r, w) for r, w in self.intersections if 'lncRNA' in r.gene_type.lower()]
-        
-        coverage_stats = {
-            'total_lncrna_regions': len(self.lncrna_regions),
-            'lncrna_regions_with_windows': len(set(r.gene_id for r, w in lncrna_intersections)),
-            'total_intersections': len(lncrna_intersections),
-            'coverage_percentage': (len(set(r.gene_id for r, w in lncrna_intersections)) / 
-                                  len(self.lncrna_regions) * 100) if self.lncrna_regions else 0
-        }
-        
-        return coverage_stats
-    
-    def generate_visualizations(self, coverage_stats):
-        # Generate visualizations for the analysis
+    def generate_umap(self, features, labels, output_path):
+        # Generate UMAP dimensionality reduction plot
         try:
+            import umap
             import matplotlib.pyplot as plt
             import numpy as np
             
-            # Create figure with subplots
-            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+            print("Generating UMAP embedding...")
             
-            # 1. lncRNA Coverage Pie Chart
-            covered = coverage_stats['lncrna_regions_with_windows']
-            not_covered = coverage_stats['total_lncrna_regions'] - covered
+            # Create UMAP embedding
+            reducer = umap.UMAP(n_components=2, random_state=42)
+            embedding = reducer.fit_transform(features)
             
-            ax1.pie([covered, not_covered], 
-                    labels=['Covered by Windows', 'Not Covered'],
-                    autopct='%1.1f%%',
-                    colors=['#2E8B57', '#FF6B6B'])
-            ax1.set_title('lncRNA Coverage by Training Windows')
+            # Create label color mapping
+            unique_labels = list(set(labels))
+            colors = plt.cm.Set3(np.linspace(0, 1, len(unique_labels)))
+            label_colors = dict(zip(unique_labels, colors))
             
-            # 2. Coverage Bar Chart
-            categories = ['Total lncRNAs', 'Covered lncRNAs', 'Total Intersections']
-            values = [coverage_stats['total_lncrna_regions'], 
-                     coverage_stats['lncrna_regions_with_windows'],
-                     coverage_stats['total_intersections']]
+            # Plot UMAP figure
+            plt.figure(figsize=(12, 8))
             
-            bars = ax2.bar(categories, values, color=['#4169E1', '#2E8B57', '#FF8C00'])
-            ax2.set_title('lncRNA Coverage Statistics')
-            ax2.set_ylabel('Count')
+            for label in unique_labels:
+                mask = np.array(labels) == label
+                plt.scatter(embedding[mask, 0], embedding[mask, 1], 
+                           c=[label_colors[label]], label=label, alpha=0.6, s=20)
             
-            # Add value labels on bars
-            for bar, value in zip(bars, values):
-                ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
-                        str(value), ha='center', va='bottom')
-            
-            # 3. Gene Type Distribution
-            gene_types = [r.gene_type for r in self.gencode_regions]
-            type_counts = Counter(gene_types)
-            top_types = dict(type_counts.most_common(10))
-            
-            ax3.bar(range(len(top_types)), list(top_types.values()))
-            ax3.set_xticks(range(len(top_types)))
-            ax3.set_xticklabels(list(top_types.keys()), rotation=45, ha='right')
-            ax3.set_title('Distribution of Gene Types in GENCODE Data')
-            ax3.set_ylabel('Count')
-            
-            # 4. Chromosome Distribution
-            chrom_counts = Counter(r.chrom for r, w in self.intersections)
-            top_chroms = dict(chrom_counts.most_common(10))
-            
-            ax4.bar(range(len(top_chroms)), list(top_chroms.values()))
-            ax4.set_xticks(range(len(top_chroms)))
-            ax4.set_xticklabels(list(top_chroms.keys()), rotation=45, ha='right')
-            ax4.set_title('Intersections by Chromosome')
-            ax4.set_ylabel('Count')
-            
+            plt.title('UMAP Visualization of GPN-MSA Training Windows\nColored by GENCODE Gene Types', 
+                     fontsize=14, fontweight='bold')
+            plt.xlabel('UMAP 1', fontsize=12)
+            plt.ylabel('UMAP 2', fontsize=12)
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.tight_layout()
-            plt.savefig(os.path.join(self.output_dir, 'lncrna_analysis.png'), dpi=300, bbox_inches='tight')
+            
+            # Save figure
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
             plt.close()
             
-            logger.info(f"Visualizations saved to {self.output_dir}/lncrna_analysis.png")
+            print(f"UMAP visualization saved to: {output_path}")
             
-        except ImportError:
-            logger.warning("matplotlib not available, skipping visualizations")
+            # Count label distribution
+            label_counts = Counter(labels)
+            print("\nLabel distribution:")
+            for label, count in sorted(label_counts.items(), key=lambda x: x[1], reverse=True):
+                print(f"  {label}: {count} ({count/len(labels)*100:.1f}%)")
+            
+            return True
+            
+        except ImportError as e:
+            print(f"Error: Required packages not available: {e}")
+            print("Please install: pip install umap-learn matplotlib")
+            return False
         except Exception as e:
-            logger.error(f"Error generating visualizations: {e}")
+            print(f"Error generating UMAP: {e}")
+            return False
     
-    def generate_report(self, coverage_stats):
-        # Generate comprehensive analysis report
-        # Count gene types in intersections
-        intersection_gene_types = Counter()
-        for region, window in self.intersections:
-            intersection_gene_types[region.gene_type] += 1
+    def run_umap_analysis(self, sample_size: int = 10000):
+        # Run complete UMAP analysis
+        print("=" * 60)
+        print("UMAP ANALYSIS - GPN-MSA Data with GENCODE Labels")
+        print("=" * 60)
         
-        # Calculate additional statistics
-        total_windows = len(self.training_windows)
-        windows_with_genes = len(set(w.window_id for r, w in self.intersections))
+        # 1. Load GPN-MSA data
+        windows = self.load_gpn_msa_data(sample_size)
+        if not windows:
+            return False
         
-        # Get top intersected genes
-        gene_counts = Counter()
-        for region, window in self.intersections:
-            gene_counts[region.gene_name] += 1
+        # 2. Get GENCODE labels
+        labels = self.get_gencode_labels(windows)
         
-        top_genes = []
-        for gene_name, count in gene_counts.most_common(10):
-            region = next((r for r in self.gencode_regions if r.gene_name == gene_name), None)
-            if region:
-                top_genes.append({
-                    'gene_name': gene_name,
-                    'gene_id': region.gene_id,
-                    'gene_type': region.gene_type,
-                    'intersection_count': count,
-                    'chromosome': region.chrom,
-                    'coordinates': f"{region.start}-{region.end}"
-                })
+        # 3. Extract features
+        features = self.extract_features(windows)
         
-        # Get chromosome distribution
-        chrom_counts = Counter(r.chrom for r, w in self.intersections)
+        # 4. Generate UMAP plot
+        output_path = self.output_dir / "gpn_msa_umap.png"
+        success = self.generate_umap(features, labels, output_path)
         
-        report = {
-            'summary': {
-                'total_gencode_regions': len(self.gencode_regions),
-                'total_lncrna_regions': coverage_stats['total_lncrna_regions'],
-                'total_training_windows': total_windows,
-                'lncrna_coverage_percentage': coverage_stats['coverage_percentage'],
-                'windows_with_gene_overlap': windows_with_genes,
-                'total_intersections': len(self.intersections)
-            },
-            'lncrna_coverage': coverage_stats,
-            'gene_type_intersections': dict(intersection_gene_types),
-            'top_intersected_genes': top_genes,
-            'chromosome_distribution': dict(chrom_counts)
-        }
-        
-        # Save report to JSON
-        report_path = os.path.join(self.output_dir, 'lncrna_analysis_report.json')
-        with open(report_path, 'w') as f:
-            json.dump(report, f, indent=2, default=str)
-        
-        logger.info(f"Analysis report saved to: {report_path}")
-        return report
-    
-    def run_analysis(self, window_size=150):
-        # Run the complete lncRNA validation analysis
-        logger.info("Starting lncRNA validation analysis...")
-        
-        # Step 1: Parse GENCODE data
-        self.parse_gencode_gtf()
-        
-        # Step 2: Parse GPN-MSA training data
-        self.parse_gpn_msa_data(window_size)
-        
-        # Step 3: Find intersections
-        self.find_intersections()
-        
-        # Step 4: Get coverage statistics
-        coverage_stats = self.get_lncrna_coverage()
-        
-        # Step 5: Generate visualizations
-        self.generate_visualizations(coverage_stats)
-        
-        # Step 6: Generate report
-        results = self.generate_report(coverage_stats)
-        
-        logger.info("Analysis completed successfully!")
-        return results
+        if success:
+            print("\nUMAP analysis completed successfully!")
+            return True
+        else:
+            print("\nUMAP analysis failed!")
+            return False
 
-def load_config(config_path):
-    # Load configuration from JSON file
-    with open(config_path, 'r') as f:
-        return json.load(f)
-
-def validate_paths(gencode_path, gpn_msa_path):
-    # Validate that input files exist
-    if not os.path.exists(gencode_path):
-        logger.error(f"GENCODE file not found: {gencode_path}")
-        return False
-    
-    if not os.path.exists(gpn_msa_path):
-        logger.error(f"GPN-MSA data file not found: {gpn_msa_path}")
-        return False
-    
-    return True
-
-def print_summary(results):
-    # Print analysis summary
-    print("\n" + "="*60)
-    print("lncRNA VALIDATION ANALYSIS SUMMARY")
-    print("="*60)
-    
-    summary = results['summary']
-    print(f"Total GENCODE regions: {summary['total_gencode_regions']:,}")
-    print(f"Total lncRNA regions: {summary['total_lncrna_regions']:,}")
-    print(f"Total training windows: {summary['total_training_windows']:,}")
-    print(f"lncRNA coverage: {summary['lncrna_coverage_percentage']:.2f}%")
-    print(f"Windows with gene overlap: {summary['windows_with_gene_overlap']:,}")
-    print(f"Total intersections: {summary['total_intersections']:,}")
-    
-    print(f"\nTop gene types in intersections:")
-    for gene_type, count in list(results['gene_type_intersections'].items())[:5]:
-        print(f"  {gene_type}: {count}")
-    
-    print(f"\nTop intersected genes:")
-    for gene in results['top_intersected_genes'][:5]:
-        print(f"  {gene['gene_name']} ({gene['gene_type']}): {gene['intersection_count']} intersections")
-    
-    print("="*60)
 
 def main():
-    # Main function
-    parser = argparse.ArgumentParser(description='lncRNA Validation Analysis')
-    
-    # Input file arguments
-    parser.add_argument('--gencode', type=str, help='Path to GENCODE GTF file')
-    parser.add_argument('--gpn-msa', type=str, help='Path to GPN-MSA training data file')
-    parser.add_argument('--config', type=str, help='Path to configuration JSON file')
-    
-    # Analysis parameters
-    parser.add_argument('--window-size', type=int, default=150, help='Training window size (default: 150)')
-    parser.add_argument('--output-dir', type=str, default='output', help='Output directory (default: output)')
+    parser = argparse.ArgumentParser(description="lncRNA Validation Analysis with UMAP")
+    parser.add_argument("--gencode", default="../../dataset/gencode.v38.basic.annotation.gtf", 
+                       help="Path to GENCODE GTF file")
+    parser.add_argument("--sample-size", type=int, default=10000, 
+                       help="Sample size for UMAP analysis")
+    parser.add_argument("--output-dir", default=".", 
+                       help="Output directory")
     
     args = parser.parse_args()
     
-    # Load configuration
-    if args.config:
-        config = load_config(args.config)
-        gencode_path = config.get('gencode_path')
-        gpn_msa_path = config.get('gpn_msa_path')
-        window_size = config.get('window_size', args.window_size)
-        output_dir = config.get('output_dir', args.output_dir)
-    else:
-        gencode_path = args.gencode
-        gpn_msa_path = args.gpn_msa
-        window_size = args.window_size
-        output_dir = args.output_dir
-    
     # Validate inputs
-    if not gencode_path or not gpn_msa_path:
-        logger.error("Please provide either --config file or both --gencode and --gpn-msa paths")
-        parser.print_help()
+    if not Path(args.gencode).exists():
+        print(f"Error: GENCODE file not found: {args.gencode}")
         return 1
     
-    if not validate_paths(gencode_path, gpn_msa_path):
-        return 1
-    
-    # Run analysis
+    # Run UMAP analysis
     try:
-        logger.info("Starting lncRNA validation analysis...")
-        logger.info(f"GENCODE file: {gencode_path}")
-        logger.info(f"GPN-MSA file: {gpn_msa_path}")
-        logger.info(f"Window size: {window_size}")
-        logger.info(f"Output directory: {output_dir}")
+        print("Starting lncRNA validation analysis...")
+        print(f"GENCODE file: {args.gencode}")
+        print(f"Sample size: {args.sample_size}")
+        print(f"Output directory: {args.output_dir}")
         
-        analyzer = lncRNAAnalyzer(gencode_path, gpn_msa_path, output_dir)
-        results = analyzer.run_analysis(window_size)
+        analyzer = UMAPAnalyzer(args.gencode, args.output_dir)
+        success = analyzer.run_umap_analysis(args.sample_size)
         
-        # Print summary
-        print_summary(results)
-        
-        return 0
-        
+        if success:
+            print("\nAnalysis completed successfully!")
+            return 0
+        else:
+            print("\nAnalysis failed!")
+            return 1
+            
     except Exception as e:
-        logger.error(f"Analysis failed: {e}")
+        print(f"Analysis failed: {e}")
         import traceback
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
