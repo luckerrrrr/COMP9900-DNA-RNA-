@@ -22,6 +22,7 @@ class GENCODEPreprocessor:
         # Args: gtf_path (GENCODE GTF file), fasta_path (genome FASTA file)
         self.gtf_path = Path(gtf_path)
         self.fasta_path = Path(fasta_path)
+        self.genome_sequence = None  # Cache for loaded genome sequence
         
         # Check if files exist
         if not self.gtf_path.exists():
@@ -169,48 +170,59 @@ class GENCODEPreprocessor:
         
         return windows
     
-    def load_sequence_from_fasta(self, chrom: str, start: int, end: int) -> Optional[str]:
-        # Load DNA sequence from FASTA file for specified genomic region
-        # Args: chrom (chromosome name), start (1-based start position), end (1-based end position)
-        # Returns: DNA sequence string or None if loading fails
+    def load_fasta_once(self):
+        # Load FASTA file into memory once (optimization for repeated access)
+        if self.genome_sequence is not None:
+            print("FASTA sequence already loaded in memory")
+            return
+        
+        print(f"Loading FASTA file into memory: {self.fasta_path}")
+        print("This may take a moment...")
+        
         try:
-            print(f"    Loading sequence for {chrom}:{start}-{end}")
-            
-            # Simple FASTA parser for single chromosome
             with open(self.fasta_path, 'r') as f:
                 lines = f.readlines()
             
             sequence = ""
-            in_target_chrom = False
+            header = None
             
-            # Parse FASTA file
             for line in lines:
                 line = line.strip()
                 if line.startswith('>'):
-                    # Check if this is our target chromosome
-                    if chrom in line or chrom.replace('chr', '') in line:
-                        in_target_chrom = True
-                        print(f"    Found target chromosome in FASTA: {line}")
-                    else:
-                        in_target_chrom = False
-                elif in_target_chrom and line and not line.startswith('>'):
-                    sequence += line.upper()  # Convert to uppercase
+                    header = line
+                    print(f"Found chromosome: {header}")
+                elif line and not line.startswith('>'):
+                    sequence += line.upper()
             
-            print(f"    Total sequence length: {len(sequence)}")
+            self.genome_sequence = sequence
+            print(f"FASTA loaded successfully! Total length: {len(sequence):,} bp")
             
-            if sequence and len(sequence) >= end:
+        except Exception as e:
+            print(f"Error loading FASTA file: {e}")
+            self.genome_sequence = None
+    
+    def load_sequence_from_fasta(self, chrom: str, start: int, end: int) -> Optional[str]:
+        # Load DNA sequence from cached genome sequence
+        # Args: chrom (chromosome name), start (1-based start position), end (1-based end position)
+        # Returns: DNA sequence string or None if loading fails
+        
+        if self.genome_sequence is None:
+            print(f"    Error: Genome sequence not loaded. Call load_fasta_once() first.")
+            return None
+        
+        try:
+            if len(self.genome_sequence) >= end:
                 # Extract the requested region (convert to 0-based indexing)
                 seq_start = start - 1
                 seq_end = end
-                extracted_seq = sequence[seq_start:seq_end]
-                print(f"    Extracted sequence length: {len(extracted_seq)}")
+                extracted_seq = self.genome_sequence[seq_start:seq_end]
                 return extracted_seq
             else:
-                print(f"    Error: Sequence too short ({len(sequence)}) for region {start}-{end}")
+                print(f"    Error: Sequence too short ({len(self.genome_sequence)}) for region {start}-{end}")
                 return None
             
         except Exception as e:
-            print(f"    Error loading sequence from FASTA: {e}")
+            print(f"    Error extracting sequence: {e}")
             return None
 
 
@@ -321,13 +333,19 @@ def process_gpn_dataset(gtf_path: str, fasta_path: str,
         
         print(f"  Total windows created: {len(all_windows)}")
         
+        # Load FASTA into memory once (huge optimization!)
+        print("\n[STEP 5] Loading FASTA file into memory...")
+        gencode_processor.load_fasta_once()
+        
         # Process sequences
-        print("\n[STEP 5] Processing sequences...")
+        print("\n[STEP 6] Processing sequences...")
         all_results = []
         processed_windows = 0
         failed_windows = 0
         
-        for window in all_windows:
+        for idx, window in enumerate(all_windows):
+            if idx % 100 == 0:
+                print(f"  Processing window {idx+1}/{len(all_windows)} ({idx*100/len(all_windows):.1f}%)")
             try:
                 # Load sequence
                 sequence = gencode_processor.load_sequence_from_fasta(
