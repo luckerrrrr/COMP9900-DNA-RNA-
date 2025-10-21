@@ -5,6 +5,7 @@ import MSAAnimation from "./animations/MSAAnimation";
 import TokenAnimation from "./animations/TokenAnimation";
 import EmbedAnimation from "./animations/EmbedAnimation";
 import PredictAnimation from "./animations/PredictAnimation";
+import EvalAnimation from "./animations/EvalAnimation";
 
 export default function DetailSection({ activeStep, steps }) {
   const currentStep = steps[activeStep - 1];
@@ -36,14 +37,11 @@ export default function DetailSection({ activeStep, steps }) {
       {/* Animation Area */}
       <div
         style={{
-          background: "rgba(255, 255, 255, 0.05)",
-          borderRadius: "12px",
           height: "500px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           marginBottom: "24px",
-          border: "1px solid rgba(0, 212, 255, 0.2)",
         }}
       >
         {activeStep === 1 && <DataAnimation />}
@@ -51,6 +49,7 @@ export default function DetailSection({ activeStep, steps }) {
         {activeStep === 3 && <TokenAnimation />}
         {activeStep === 4 && <EmbedAnimation />}
         {activeStep === 5 && <PredictAnimation />}
+        {activeStep === 6 && <EvalAnimation />}
       </div>
 
       <div style={{ color: "rgba(255, 255, 255, 0.7)", lineHeight: 1.8 }}>
