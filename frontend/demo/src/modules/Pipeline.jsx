@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import StepCards from "../components/pipeline/StepCards";
-import DetailSection from "../components/pipeline/DetailSection";
+import PipelineDetailSection from "../components/pipeline/PipelineDetailSection";
 import { PIPELINE_STEPS } from "../constants/pipelineSteps";
 import { SiJfrogpipelines } from "react-icons/si";
-
 
 export default function Module2Pipeline() {
   const [activeStep, setActiveStep] = useState(null);
@@ -38,7 +37,7 @@ export default function Module2Pipeline() {
       />
 
       {/* Detail Section */}
-      <DetailSection activeStep={activeStep} steps={PIPELINE_STEPS} />
+      <PipelineDetailSection activeStep={activeStep} steps={PIPELINE_STEPS} />
     </div>
   );
 }

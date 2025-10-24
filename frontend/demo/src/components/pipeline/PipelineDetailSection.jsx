@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { STEP_DESCRIPTIONS } from "../../constants/pipelineSteps";
-import DataAnimation from "./animations/DataAnimation"; 
+import DataAnimation from "./animations/DataAnimation";
 import MSAAnimation from "./animations/MSAAnimation";
 import TokenAnimation from "./animations/TokenAnimation";
 import EmbedAnimation from "./animations/EmbedAnimation";
@@ -8,7 +8,7 @@ import PredictAnimation from "./animations/PredictAnimation";
 import EvalAnimation from "./animations/EvalAnimation";
 import { FaArrowUp } from "react-icons/fa";
 
-export default function DetailSection({ activeStep, steps }) {
+export default function PipelineDetailSection({ activeStep, steps }) {
   if (!activeStep) {
     return (
       <div
@@ -21,7 +21,9 @@ export default function DetailSection({ activeStep, steps }) {
         }}
       >
         <div style={{ textAlign: "center", opacity: 0.5 }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px", color: "#00d4ff" }}>
+          <div
+            style={{ fontSize: "48px", marginBottom: "16px", color: "#00d4ff" }}
+          >
             <FaArrowUp />
           </div>
           <div style={{ fontSize: "40px", color: "rgba(255, 255, 255, 0.7)" }}>

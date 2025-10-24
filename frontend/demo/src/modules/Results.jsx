@@ -7,10 +7,10 @@ import {
   FaDna,
   FaLightbulb
 } from "react-icons/fa";
-import PieChart from "./PieChart.jsx";
-import EmbeddingHeatmap from "./EmbeddingHeatmap.jsx";
-import UMAPClustering from "./UMAPClustering.jsx";
-import CrossSpeciesComparison from "./CrossSpeciesComparison.jsx";
+import PieChart from "../components/result/PieChart.jsx";
+import EmbeddingHeatmap from "../components/result/EmbeddingHeatmap.jsx";
+import UMAPClustering from "../components/result/UMAPClustering.jsx";
+import CrossSpeciesComparison from "../components/result/CrossSpeciesComparison.jsx";
 
 export default function Module5Results() {
   const [activeChart, setActiveChart] = useState(0);
@@ -35,6 +35,7 @@ export default function Module5Results() {
         style={{
           textAlign: "center",
           marginBottom: "60px",
+          marginTop: "600px",
         }}
       >
         <h1 style={{
