@@ -6,8 +6,32 @@ import TokenAnimation from "./animations/TokenAnimation";
 import EmbedAnimation from "./animations/EmbedAnimation";
 import PredictAnimation from "./animations/PredictAnimation";
 import EvalAnimation from "./animations/EvalAnimation";
+import { FaArrowUp } from "react-icons/fa";
 
 export default function DetailSection({ activeStep, steps }) {
+  if (!activeStep) {
+    return (
+      <div
+        style={{
+          height: "500px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "24px",
+        }}
+      >
+        <div style={{ textAlign: "center", opacity: 0.5 }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px", color: "#00d4ff" }}>
+            <FaArrowUp />
+          </div>
+          <div style={{ fontSize: "40px", color: "rgba(255, 255, 255, 0.7)" }}>
+            Click a step above to view details
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const currentStep = steps[activeStep - 1];
 
   return (
@@ -19,12 +43,14 @@ export default function DetailSection({ activeStep, steps }) {
       style={{
         background: "rgba(255, 255, 255, 0.03)",
         borderRadius: "20px",
-        padding: "40px",
-        border: "1px solid rgba(0, 212, 255, 0.2)",
+        padding: "20px",
+        border: "2px solid rgba(0, 212, 255, 0.2)",
         minHeight: "400px",
+        width: "80%",
+        margin: "40px auto 0 auto",
       }}
     >
-      <h3
+      {/* <h3
         style={{
           color: "#00d4ff",
           fontSize: "35px",
@@ -32,7 +58,7 @@ export default function DetailSection({ activeStep, steps }) {
         }}
       >
         Step {activeStep}: {currentStep.title} {currentStep.subtitle}
-      </h3>
+      </h3> */}
 
       {/* Animation Area */}
       <div
@@ -52,9 +78,9 @@ export default function DetailSection({ activeStep, steps }) {
         {activeStep === 6 && <EvalAnimation />}
       </div>
 
-      <div style={{ color: "rgba(255, 255, 255, 0.7)", lineHeight: 1.8 }}>
+      {/* <div style={{ color: "rgba(255, 255, 255, 0.7)", lineHeight: 1.8, fontSize: "20px" }}>
         {STEP_DESCRIPTIONS[activeStep]}
-      </div>
+      </div> */}
     </motion.div>
   );
 }

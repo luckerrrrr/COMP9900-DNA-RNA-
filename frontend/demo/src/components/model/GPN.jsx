@@ -16,8 +16,8 @@ export default function Module3GPN() {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const rectSize = 12;
-    const padding = 2;
+    const rectSize = 28;
+    const padding = 4;
 
     svg
       .selectAll("rect")
@@ -28,7 +28,7 @@ export default function Module3GPN() {
       .attr("y", 80)
       .attr("width", rectSize)
       .attr("height", rectSize)
-      .attr("rx", 3)
+      .attr("rx", 5)
       .attr("fill", (d) => baseColors[d]);
 
     svg
@@ -37,9 +37,11 @@ export default function Module3GPN() {
       .enter()
       .append("text")
       .attr("x", (d, i) => i * (rectSize + padding) + rectSize / 2)
-      .attr("y", 75)
+      .attr("y", 80 + rectSize / 2 + 6)
       .attr("text-anchor", "middle")
-      .attr("font-size", "10px")
+      .attr("font-size", "18px")
+      .attr("font-weight", "700")
+      
       .text((d) => d);
   }, [sequence]);
 
@@ -63,8 +65,8 @@ export default function Module3GPN() {
     () => {
       const svg = d3.select(svgRef.current);
       const width = 800;
-      const rectSize = 12;
-      const padding = 2;
+      const rectSize = 28;
+      const padding = 4;
 
       const lines = svg.append("g").attr("class", "attention-lines");
       for (let i = 0; i < 10; i++) {
@@ -74,7 +76,7 @@ export default function Module3GPN() {
           .append("path")
           .attr("d", `M${x1},80 Q${(x1 + x2) / 2},40 ${x2},80`)
           .attr("stroke", "#ff00ff")
-          .attr("stroke-width", 0.5)
+          .attr("stroke-width", 1)
           .attr("fill", "none")
           .attr("opacity", 0)
           .transition()
@@ -138,31 +140,34 @@ export default function Module3GPN() {
         textAlign: "center",
       }}
     >
-      <h2 style={{ fontSize: "32px", marginBottom: "20px" }}>GPN Model Animation</h2>
+      <h2 style={{ fontSize: "32px", marginBottom: "20px" }}>
+        GPN Model Animation
+      </h2>
       <svg ref={svgRef} width={800} height={200}></svg>
-      <motion.p 
-        key={step} 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
+      <motion.p
+        key={step}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        style={{ fontSize: "18px", margin: "20px 0" }}
+        style={{ fontSize: "28px", margin: "20px 0" }}
       >
         {stepTexts[step]}
       </motion.p>
       <button
         onClick={() => setStep((s) => Math.min(s + 1, stepTexts.length - 1))}
-        style={{ 
-          marginTop: "10px", 
-          padding: "8px 16px", 
+        style={{
+          marginTop: "10px",
+          padding: "8px 16px",
           cursor: "pointer",
           background: "rgba(0, 212, 255, 0.2)",
           border: "1px solid #00d4ff",
           color: "#00d4ff",
           borderRadius: "8px",
-          fontSize: "16px",
+          fontSize: "20px",
+          minWidth: "140px",
         }}
       >
-        Next Step
+        Next
       </button>
     </motion.div>
   );

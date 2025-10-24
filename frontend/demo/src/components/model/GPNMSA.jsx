@@ -15,7 +15,7 @@ export default function Module3GPNMSA() {
   // 生成多序列对齐矩阵
   useEffect(() => {
     const bases = ["A", "T", "C", "G"];
-    const seqLength = 50; // 示例长度
+    const seqLength = 28; // 示例长度
     const matrix = [];
     for (let i = 0; i < msaCount; i++) {
       const row = Array.from({ length: seqLength }, () => bases[Math.floor(Math.random() * 4)]);
@@ -36,51 +36,52 @@ export default function Module3GPNMSA() {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
   
-    const rectSize = 12;
-    const padding = 2;
-    const textAbove = 5;       
-    const rowGap = 30;          
-  
-    sequenceMatrix.forEach((seq, rowIdx) => {
-      const yRect = 50 + rowIdx * rowGap;
-      const yText = yRect - textAbove;
-  
-      // --- 文本行 ---
-      svg
-        .selectAll(`text.seq-text-${rowIdx}`)
-        .data(seq)
-        .enter()
-        .append("text")
-        .attr("class", `seq-text-${rowIdx}`)
-        .attr("x", (d, i) => i * (rectSize + padding) + rectSize / 2)
-        .attr("y", yText)
-        .attr("text-anchor", "middle")
-        .attr("dominant-baseline", "alphabetic")
-        .attr("font-size", 12)
-        .attr("fill", "#000")
-        .text((d, i) => {
-          if (rowIdx === 0 && maskedIndices.includes(i) && step >= 1) return "";
-          return d;
-        });
-  
-      // --- 矩形 ---
-      svg
-        .selectAll(`.row-${rowIdx}`)
-        .data(seq)
-        .enter()
-        .append("rect")
-        .attr("class", `row-${rowIdx}`)
-        .attr("x", (d, i) => i * (rectSize + padding))
-        .attr("y", yRect)
-        .attr("width", rectSize)
-        .attr("height", rectSize)
-        .attr("rx", 2)
-        .attr("fill", (d, i) => {
-          if (rowIdx === 0 && maskedIndices.includes(i) && step >= 1) return baseColors.mask;
-          return baseColors[d];
-        })
-        .attr("opacity", rowIdx === 0 ? 1 : 0.35);
+const rectSize = 28;
+const padding = 4;
+const rowGap = 50; 
+
+sequenceMatrix.forEach((seq, rowIdx) => {
+  const yRect = 40 + rowIdx * rowGap; 
+  const yText = yRect + rectSize / 2 + 3; 
+
+  // --- 先画矩形 ---
+  svg
+    .selectAll(`.row-${rowIdx}`)
+    .data(seq)
+    .enter()
+    .append("rect")
+    .attr("class", `row-${rowIdx}`)
+    .attr("x", (d, i) => i * (rectSize + padding))
+    .attr("y", yRect)
+    .attr("width", rectSize)
+    .attr("height", rectSize)
+    .attr("rx", 5)
+    .attr("fill", (d, i) => {
+      if (rowIdx === 0 && maskedIndices.includes(i) && step >= 1) {
+        return baseColors.mask;
+      }
+      return baseColors[d];
+    })
+    .attr("opacity", rowIdx === 0 ? 1 : 0.4);
+
+  // --- 再画文本（在矩形上面） ---
+  svg
+    .selectAll(`text.seq-text-${rowIdx}`)
+    .data(seq)
+    .enter()
+    .append("text")
+    .attr("class", `seq-text-${rowIdx}`)
+    .attr("x", (d, i) => i * (rectSize + padding) + rectSize / 2)
+    .attr("y", yText) 
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle") 
+    .attr("font-size", "18px")
+    .attr("font-weight", "700") 
+    .text((d, i) => {
+      if (rowIdx === 0 && maskedIndices.includes(i) && step >= 1) return "";
+      return d;
     });
+});
   
     // Step 2: 模型观察其他物种
     if (step >= 2) {
@@ -137,20 +138,26 @@ export default function Module3GPNMSA() {
   };
 
   return (
-    <div style={{ 
-      display: "flex", 
-      flexDirection: "column", 
-      alignItems: "center", 
-      justifyContent: "center",
-      color: "#fff"
-    }}>
-      <h2 style={{ fontSize: "32px", marginBottom: "20px" }}>GPN-MSA Model Animation</h2>
-      <svg ref={svgRef} width={900} height={200} style={{ border: "1px solid #ccc" }} />
-      <div style={{ 
-        display: "flex", 
-        gap: "16px", 
-        marginTop: "16px" 
-      }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#fff",
+      }}
+    >
+      <h2 style={{ fontSize: "32px", marginBottom: "20px" }}>
+        GPN-MSA Model Animation
+      </h2>
+      <svg ref={svgRef} width={900} height={200} />
+      <div
+        style={{
+          display: "flex",
+          gap: "16px",
+          marginTop: "16px",
+        }}
+      >
         <button
           onClick={prevStep}
           style={{
@@ -160,10 +167,11 @@ export default function Module3GPNMSA() {
             border: "1px solid rgba(255, 255, 255, 0.3)",
             color: "#fff",
             cursor: "pointer",
-            fontSize: "14px",
+            fontSize: "20px",
+            minWidth: "140px",
           }}
         >
-          Previous step
+          Previous
         </button>
         <button
           onClick={nextStep}
@@ -174,18 +182,21 @@ export default function Module3GPNMSA() {
             border: "1px solid #00d4ff",
             color: "#00d4ff",
             cursor: "pointer",
-            fontSize: "14px",
+            fontSize: "20px",
+            minWidth: "140px",
           }}
         >
-          Next step
+          Next
         </button>
       </div>
-      <div style={{ 
-        marginTop: "8px", 
-        textAlign: "center",
-        color: "rgba(255, 255, 255, 0.8)",
-        fontSize: "14px"
-      }}>
+      <div
+        style={{
+          marginTop: "20px",
+          textAlign: "center",
+          color: "rgba(255, 255, 255, 0.8)",
+          fontSize: "20px",
+        }}
+      >
         {step === 0 && "Step 0: Original input sequence"}
         {step === 1 && "Step 1: Mask target sequence"}
         {step === 2 && "Step 2: Model observes gene sequences of other species"}

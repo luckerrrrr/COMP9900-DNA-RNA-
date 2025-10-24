@@ -5,8 +5,9 @@ import DetailSection from "../components/pipeline/DetailSection";
 import { PIPELINE_STEPS } from "../constants/pipelineSteps";
 import { SiJfrogpipelines } from "react-icons/si";
 
+
 export default function Module2Pipeline() {
-  const [activeStep, setActiveStep] = useState(1);
+  const [activeStep, setActiveStep] = useState(null);
 
   return (
     <div
@@ -23,7 +24,7 @@ export default function Module2Pipeline() {
         style={{
           textAlign: "center",
           fontSize: "clamp(32px, 5vw, 48px)",
-          marginBottom: "60px",
+          marginBottom: "20px",
         }}
       >
         <SiJfrogpipelines /> Data Processing Pipeline

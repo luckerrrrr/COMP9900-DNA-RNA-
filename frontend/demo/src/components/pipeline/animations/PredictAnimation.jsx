@@ -215,7 +215,7 @@ function MaskedSequence() {
                 ?
                 <div
                   style={{
-                    fontSize: "10px",
+                    fontSize: "14px",
                     color: "#666",
                     marginTop: "4px",
                   }}

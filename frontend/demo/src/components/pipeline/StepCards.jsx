@@ -7,7 +7,7 @@ export default function StepCards({ steps, activeStep, onStepClick }) {
         display: "flex",
         justifyContent: "center",
         gap: "20px",
-        marginBottom: "80px",
+        marginBottom: "50px",
         flexWrap: "wrap",
       }}
     >

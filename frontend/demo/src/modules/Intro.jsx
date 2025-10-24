@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import DNA3D from "../components/DNA3D";
+import DNA3D from "../components/intro/DNA3D";
 
 export default function Module1Intro() {
   return (
@@ -29,7 +29,6 @@ export default function Module1Intro() {
         <DNA3D width="100%" height="100%" />
       </div>
 
-      {/* 标题靠左 */}
       <motion.h1
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}

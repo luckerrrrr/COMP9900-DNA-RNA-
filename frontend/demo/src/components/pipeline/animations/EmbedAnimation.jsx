@@ -172,7 +172,7 @@ function TokenSequence() {
           textAlign: "center",
           fontSize: "30px",
           color: "rgba(255, 255, 255, 0.5)",
-          marginTop: "10px",
+          marginTop: "20px",
         }}
       >
         8 tokens, 1 dimension

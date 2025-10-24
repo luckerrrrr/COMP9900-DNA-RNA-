@@ -131,11 +131,13 @@ function UnalignedSequences() {
             display: "flex",
             alignItems: "center",
             gap: "20px",
+            justifyContent: "center",
+            width: "100%",
           }}
         >
           <div
             style={{
-              minWidth: "100px",
+              minWidth: "120px",
               fontSize: "30px",
               color: item.color,
               fontWeight: "500",
@@ -183,12 +185,14 @@ function AlignmentProcess() {
           style={{
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
             gap: "20px",
           }}
         >
           <div
             style={{
-              minWidth: "100px",
+              minWidth: "120px",
               fontSize: "30px",
               color: item.color,
               fontWeight: "500",
@@ -273,11 +277,13 @@ function ConservedRegions() {
               display: "flex",
               alignItems: "center",
               gap: "20px",
+              justifyContent: "center",
+              width: "100%",
             }}
           >
             <div
               style={{
-                minWidth: "100px",
+                minWidth: "120px",
                 fontSize: "30px",
                 color: item.color,
                 fontWeight: "500",

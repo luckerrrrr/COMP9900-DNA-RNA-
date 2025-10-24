@@ -9,8 +9,8 @@ export default function StepCard({ step, index, isActive, onClick }) {
       transition={{ delay: index * 0.1 }}
       whileHover={{ scale: 1.05 }}
       style={{
-        width: isActive ? "130px" : "100px",
-        height: isActive ? "130px" : "100px",
+        width: isActive ? "150px" : "130px",
+        height: isActive ? "150px" : "130px",
         borderRadius: "16px",
         background: isActive
           ? "rgba(0, 212, 255, 0.15)"
@@ -39,7 +39,7 @@ export default function StepCard({ step, index, isActive, onClick }) {
       </div>
       <div
         style={{
-          fontSize: "16px",
+          fontSize: "17px",
           fontWeight: isActive ? "bold" : "normal",
           color: isActive ? "#00d4ff" : "#fff",
         }}
@@ -48,7 +48,7 @@ export default function StepCard({ step, index, isActive, onClick }) {
       </div>
       <div
         style={{
-          fontSize: "16px",
+          fontSize: "17px",
           opacity: 0.6,
           marginTop: "2px",
         }}

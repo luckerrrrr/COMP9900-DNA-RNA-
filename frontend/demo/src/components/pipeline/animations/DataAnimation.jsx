@@ -71,7 +71,7 @@ export default function DataAnimation() {
               padding: "8px 20px",
               borderRadius: "8px",
               cursor: "pointer",
-              fontSize: "30px",
+              fontSize: "20px",
               fontWeight: "500",
               display: "flex",
               alignItems: "center",
