@@ -16,10 +16,10 @@ export default function Module5Results() {
   const [activeChart, setActiveChart] = useState(0);
 
   const charts = [
-    { id: 0, title: "lncRNA matching ratio", icon: <FaChartPie />, component: <PieChart /> },
-    { id: 1, title: "Embedding heatmap", icon: <FaFire />, component: <EmbeddingHeatmap /> },
+    { id: 0, title: "Pre-training evaluation", icon: <FaChartPie />, component: <PieChart /> },
+    // { id: 1, title: "Embedding heatmap", icon: <FaFire />, component: <EmbeddingHeatmap /> },
     { id: 2, title: "UMAP clustering", icon: <FaProjectDiagram />, component: <UMAPClustering /> },
-    { id: 3, title: "Cross-species comparison", icon: <FaDna />, component: <CrossSpeciesComparison /> }
+    // { id: 3, title: "Cross-species comparison", icon: <FaDna />, component: <CrossSpeciesComparison /> }
   ];
 
   return (
@@ -69,22 +69,22 @@ export default function Module5Results() {
         marginBottom: "40px",
         flexWrap: "wrap"
       }}>
-        {charts.map((chart) => (
+        {charts.map((chart, index) => (
           <motion.button
             key={chart.id}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setActiveChart(chart.id)}
+            onClick={() => setActiveChart(index)}
             style={{
               padding: "12px 24px",
               borderRadius: "12px",
-              background: activeChart === chart.id 
+              background: activeChart === index 
                 ? "rgba(0, 212, 255, 0.2)" 
                 : "rgba(255, 255, 255, 0.05)",
-              border: activeChart === chart.id 
+              border: activeChart === index 
                 ? "2px solid #00d4ff" 
                 : "1px solid rgba(255, 255, 255, 0.1)",
-              color: activeChart === chart.id ? "#00d4ff" : "rgba(255, 255, 255, 0.7)",
+              color: activeChart === index ? "#00d4ff" : "rgba(255, 255, 255, 0.7)",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
