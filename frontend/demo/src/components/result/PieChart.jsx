@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 
 export default function PieChart() {
   const images = [
-    { src: "/msa_umap.png", label: "GPN-MSA", top: 30, left: 100 },
+    { src: "/GPN.jpg", label: "GPN model metrics", top: 10, left: 50 },
   ];
 
   return (
@@ -23,7 +23,7 @@ export default function PieChart() {
       }}>
         {images.map((img, idx) => (
           <div key={idx} style={{ position: "absolute", top: img.top, left: img.left }}>
-            <img src={img.src} alt={img.label} style={{ width: "300px", borderRadius: "6px" }} />
+            <img src={img.src} alt={img.label} style={{ width: "400px", borderRadius: "6px" }} />
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -47,7 +47,7 @@ export default function PieChart() {
           lineHeight: "1.6"
         }}
       >
-       The figure above shows the performance metrics of the GPN-MSA model after pre-training using human and mouse data.
+       The figure above shows the performance metrics of the GPN model after pre-training using human and mouse data.
       </motion.p>
     </div>
   );

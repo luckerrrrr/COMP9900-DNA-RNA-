@@ -232,91 +232,81 @@ export default function Module3GPN() {
       const svg = d3.select(svgRef.current);
       if (!svgRef.current) return;
       svg.selectAll("*").remove();
-
+    
       const rectSize = 28;
       const padding = 4;
-      const seqWidth = seqLength * (rectSize + padding);
-      const svgWidth = 800;
-      const startX = (svgWidth - seqWidth) / 2;
-
-      svg.attr("height", 200);
-
-      const g = svg.append("g").attr("transform", `translate(${startX}, 0)`);
-
-      const humanY = 50;
-      const mouseY = 110;
-
-      // Human tag
-      g.append("text")
-        .attr("class", "species-label human-label")
-        .attr("x", 0)
-        .attr("y", humanY + rectSize / 2 - 20)
-        .attr("text-anchor", "start")
-        .attr("font-size", "18px")
-        .attr("font-weight", "700")
-        .attr("fill", "rgb(0, 212, 255)")
-        .text("🧑 Human");
 
       // Mapping human sequences
-      g.selectAll("rect.human")
+      svg.selectAll("rect.human")
         .data(sequence)
         .enter()
         .append("rect")
         .attr("class", "human")
         .attr("x", (d, i) => i * (rectSize + padding))
-        .attr("y", humanY)
+        .attr("y", 150)
         .attr("width", rectSize)
         .attr("height", rectSize)
         .attr("rx", 5)
-        .attr("fill", (d) => baseColors[d]);
+        .attr("fill", d => baseColors[d]);
 
-      g.selectAll("text.human")
+      svg.selectAll("text.human")
         .data(sequence)
         .enter()
         .append("text")
         .attr("class", "human")
         .attr("x", (d, i) => i * (rectSize + padding) + rectSize / 2)
-        .attr("y", humanY + rectSize / 2 + 6)
+        .attr("y", 150 + rectSize / 2 + 6)
         .attr("text-anchor", "middle")
         .attr("font-size", "18px")
         .attr("font-weight", "700")
-        .text((d) => d);
+        .text(d => d);
 
-      // Mouse tag
-      g.append("text")
-        .attr("class", "species-label mouse-label")
-        .attr("x", 0)
-        .attr("y", mouseY + rectSize / 2 - 20)
-        .attr("text-anchor", "start")
-        .attr("font-size", "18px")
-        .attr("font-weight", "700")
-        .attr("fill", "rgb(255, 107, 157")
-        .text("🐭 Mouse");
+      // Human tag
+      svg.append("text")
+      .attr("class", "species-label human-label")
+      .attr("x", 0)
+      .attr("y", 150 + rectSize / 2 - 20)
+      .attr("text-anchor", "start")
+      .attr("font-size", "18px")
+      .attr("font-weight", "700")
+      .attr("fill", "rgb(0, 212, 255)") 
+      .text("🧑 Human");
 
       // Mapping mouse sequences
-      g.selectAll("rect.mouse")
+      svg.selectAll("rect.mouse")
         .data(mouseSequence)
         .enter()
         .append("rect")
         .attr("class", "mouse")
         .attr("x", (d, i) => i * (rectSize + padding))
-        .attr("y", mouseY)
+        .attr("y", 240)
         .attr("width", rectSize)
         .attr("height", rectSize)
         .attr("rx", 5)
-        .attr("fill", (d) => baseColors[d]);
+        .attr("fill", d => baseColors[d]);
 
-      g.selectAll("text.mouse")
+      svg.selectAll("text.mouse")
         .data(mouseSequence)
         .enter()
         .append("text")
         .attr("class", "mouse")
         .attr("x", (d, i) => i * (rectSize + padding) + rectSize / 2)
-        .attr("y", mouseY + rectSize / 2 + 6)
+        .attr("y", 240 + rectSize / 2 + 6)
         .attr("text-anchor", "middle")
         .attr("font-size", "18px")
         .attr("font-weight", "700")
-        .text((d) => d);
+        .text(d => d);
+
+      // Mouse tag
+      svg.append("text")
+      .attr("class", "species-label mouse-label")
+      .attr("x", 0)
+      .attr("y", 240 + rectSize / 2 - 20)
+      .attr("text-anchor", "start")
+      .attr("font-size", "18px")
+      .attr("font-weight", "700")
+      .attr("fill", "rgb(255, 107, 157") 
+      .text("🐭 Mouse");
     },
     // Step 2: Mask 15% of bases
     () => {
@@ -345,32 +335,26 @@ export default function Module3GPN() {
 
       const rectSize = 28;
       const padding = 4;
-      const humanY = 50;
 
       // Select the centered group to append attention lines
-      const g = svg.select("g");
-      const lines = g.append("g").attr("class", "attention-lines");
+      const lines = svg.append("g").attr("class", "attention-lines");
 
       maskedIndices.current.forEach((maskIdx, i) => {
+        // Left
         let left = maskIdx - 1;
         while (left >= 0 && maskedIndices.current.includes(left)) left--;
+        // Right
         let right = maskIdx + 1;
-        while (right < sequence.length && maskedIndices.current.includes(right))
-          right++;
+        while (right < sequence.length && maskedIndices.current.includes(right)) right++;
 
         if (left >= 0 && right < sequence.length) {
           const x1 = left * (rectSize + padding) + rectSize / 2;
           const x2 = right * (rectSize + padding) + rectSize / 2;
-          const y = humanY + rectSize / 2;
+          const y = 150 + rectSize / 2; 
 
           lines
             .append("path")
-            .attr(
-              "d",
-              `M${x1},${y} Q${maskIdx * (rectSize + padding) + rectSize / 2},${
-                y - 80
-              } ${x2},${y}`
-            )
+            .attr("d", `M${x1},${y} Q${maskIdx * (rectSize + padding) + rectSize / 2},${y - 80} ${x2},${y}`)
             .attr("stroke", "#ff00ff")
             .attr("stroke-width", 3)
             .attr("fill", "none")
