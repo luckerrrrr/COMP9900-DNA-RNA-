@@ -4,9 +4,10 @@ import DataAnimation from "./animations/DataAnimation";
 import MSAAnimation from "./animations/MSAAnimation";
 import TokenAnimation from "./animations/TokenAnimation";
 import EmbedAnimation from "./animations/EmbedAnimation";
-import PredictAnimation from "./animations/PredictAnimation";
+import ClassificationAnimation from "./animations/ClassificationAnimation";
 import EvalAnimation from "./animations/EvalAnimation";
 import { FaArrowUp } from "react-icons/fa";
+import ClassifierExplanation from "./animations/ClassifierExplanation"
 
 export default function PipelineDetailSection({ activeStep, steps }) {
   if (!activeStep) {
@@ -45,7 +46,7 @@ export default function PipelineDetailSection({ activeStep, steps }) {
       style={{
         background: "rgba(255, 255, 255, 0.03)",
         borderRadius: "20px",
-        padding: "20px",
+        padding: "40px",
         border: "2px solid rgba(0, 212, 255, 0.2)",
         minHeight: "400px",
         width: "80%",
@@ -76,7 +77,7 @@ export default function PipelineDetailSection({ activeStep, steps }) {
         {activeStep === 2 && <MSAAnimation />}
         {activeStep === 3 && <TokenAnimation />}
         {activeStep === 4 && <EmbedAnimation />}
-        {activeStep === 5 && <PredictAnimation />}
+        {activeStep === 5 && <ClassificationAnimation />}
         {activeStep === 6 && <EvalAnimation />}
       </div>
 

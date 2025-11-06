@@ -13,7 +13,12 @@ export const PIPELINE_STEPS = [
   { id: 2, title: "MSA", subtitle: "Alignment", icon: <FaDna /> },
   { id: 3, title: "Tokenisation", subtitle: "Encoding", icon: <FaFont /> },
   { id: 4, title: "Embedding", subtitle: "Representation", icon: <FaBrain /> },
-  { id: 5, title: "Prediction", subtitle: "Recovery", icon: <FaBullseye /> },
+  {
+    id: 5,
+    title: "Classification",
+    subtitle: "Linear Probing",
+    icon: <FaBullseye />,
+  },
   { id: 6, title: "Evaluation", subtitle: "Analysis", icon: <FaChartLine /> },
 ];
 
