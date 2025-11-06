@@ -7,7 +7,6 @@ import EmbedAnimation from "./animations/EmbedAnimation";
 import ClassificationAnimation from "./animations/ClassificationAnimation";
 import EvalAnimation from "./animations/EvalAnimation";
 import { FaArrowUp } from "react-icons/fa";
-import ClassifierExplanation from "./animations/ClassifierExplanation"
 
 export default function PipelineDetailSection({ activeStep, steps }) {
   if (!activeStep) {

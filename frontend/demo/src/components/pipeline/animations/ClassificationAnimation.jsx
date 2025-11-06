@@ -1,11 +1,8 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { FcPrivacy } from "react-icons/fc";
-import { GiDna2 } from "react-icons/gi";
 import {
   IoSnowOutline,
-  IoFlameOutline,
-  IoCheckmarkCircleOutline,
 } from "react-icons/io5";
 import { TbMathFunction } from "react-icons/tb";
 
