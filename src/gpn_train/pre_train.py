@@ -8,12 +8,13 @@ import gpn.model
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 import torch.optim as optim
 from torch.optim.lr_scheduler import LinearLR
+from sklearn.model_selection import train_test_split
 import sys
 import json
 import time
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import argparse
 import warnings
 warnings.filterwarnings('ignore')
@@ -61,35 +62,107 @@ class GPNPreTrainer:
         return True
     
     def load_training_data(self):
-        # Load training data from JSON
-        data_path = Path(self.config.get('data_path', 'data/gpn_preprocessing_results.json'))
+        # Load training data from JSON and split into train/test (80/20)
+        # FIXED: Split by window_id to prevent data leakage
+        data_path = Path(self.config.get('data_path', 'data/human_gpn_preprocessing_results.json'))
+        test_size = self.config.get('test_size', 0.2)  # 80/20 split by default
+        random_state = self.config.get('random_state', 42)
         
         if not data_path.exists():
             logger.error(f"Data not found: {data_path}")
-            return None
+            return None, None
         
         logger.info(f"Loading: {data_path}")
         with open(data_path) as f:
             data = json.load(f)
         
-        # Extract sequences
-        training_data = [
-            {'sequence': item['masked_sequence'], 'original': item.get('original_sequence', '')}
+        # Extract sequences with full metadata
+        all_data = [
+            {
+                'sequence': item['masked_sequence'], 
+                'original': item.get('original_sequence', ''),
+                **{k: v for k, v in item.items() if k not in ['masked_sequence', 'original_sequence']}
+            }
             for item in data if item.get('masked_sequence')
         ]
         
-        logger.info(f"Loaded {len(training_data)} examples")
-        return training_data
-    
-    def create_dataset(self, training_data: List[Dict]):
-        # Create PyTorch dataset
+        logger.info(f"Loaded {len(all_data)} examples")
         
+        # Group sequences by window_id to prevent data leakage
+        # Each window has 2 sequences: original + reverse_complement
+        window_groups = {}
+        for item in all_data:
+            window_id = item.get('window_id', '')
+            if window_id not in window_groups:
+                window_groups[window_id] = []
+            window_groups[window_id].append(item)
+        
+        logger.info(f"Found {len(window_groups)} unique windows")
+        
+        # Split windows (not sequences) into train/test
+        window_ids = list(window_groups.keys())
+        train_window_ids, test_window_ids = train_test_split(
+            window_ids,
+            test_size=test_size,
+            random_state=random_state,
+            shuffle=True
+        )
+        
+        # Collect all sequences for each window split
+        train_data = []
+        for wid in train_window_ids:
+            train_data.extend(window_groups[wid])
+        
+        test_data = []
+        for wid in test_window_ids:
+            test_data.extend(window_groups[wid])
+        
+        logger.info(f"Data split (80/20) by window:")
+        logger.info(f"  Training windows: {len(train_window_ids)} ({len(train_window_ids)/len(window_ids)*100:.1f}%)")
+        logger.info(f"  Test windows: {len(test_window_ids)} ({len(test_window_ids)/len(window_ids)*100:.1f}%)")
+        logger.info(f"  Training sequences: {len(train_data)} ({len(train_data)/len(all_data)*100:.1f}%)")
+        logger.info(f"  Test sequences: {len(test_data)} ({len(test_data)/len(all_data)*100:.1f}%)")
+        logger.info(f"  ? No data leakage: train and test have completely different windows")
+        
+        # Save test set for later evaluation
+        test_data_path = self.output_dir / 'test_data.json'
+        with open(test_data_path, 'w') as f:
+            json.dump(test_data, f, indent=2)
+        logger.info(f"Test set saved to: {test_data_path}")
+        
+        # Extract only sequences for training
+        # Note: train_data items already have 'sequence' key (from masked_sequence)
+        training_data = [
+            {'sequence': item['sequence'], 'original': item.get('original', '')}
+            for item in train_data if item.get('sequence')
+        ]
+        
+        return training_data, test_data
+ 
+    def create_dataset(self, training_data: List[Dict]):
+        # Create PyTorch dataset with MLM masking
+  
         class GPNDataset(Dataset):
-            def __init__(self, data, tokenizer, max_length):
+            def __init__(self, data, tokenizer, max_length, mask_prob=0.15):
                 self.data = data
                 self.tokenizer = tokenizer
                 self.max_length = max_length
-            
+                self.mask_prob = mask_prob
+                
+                # Get special token IDs that should not be masked
+                self.special_tokens = set()
+                if hasattr(tokenizer, 'pad_token_id') and tokenizer.pad_token_id is not None:
+                    self.special_tokens.add(tokenizer.pad_token_id)
+                if hasattr(tokenizer, 'cls_token_id') and tokenizer.cls_token_id is not None:
+                    self.special_tokens.add(tokenizer.cls_token_id)
+                if hasattr(tokenizer, 'sep_token_id') and tokenizer.sep_token_id is not None:
+                    self.special_tokens.add(tokenizer.sep_token_id)
+                if hasattr(tokenizer, 'mask_token_id') and tokenizer.mask_token_id is not None:
+                    self.mask_token_id = tokenizer.mask_token_id
+                else:
+                    # If no mask token, use a placeholder (shouldn't happen with MLM models)
+                    self.mask_token_id = tokenizer.unk_token_id if hasattr(tokenizer, 'unk_token_id') else 0
+
             def __len__(self):
                 return len(self.data)
             
@@ -102,13 +175,31 @@ class GPNPreTrainer:
                     return_tensors='pt'
                 )
                 
-                labels = tokens['input_ids'].clone()
-                labels[labels == self.tokenizer.pad_token_id] = -100
+                input_ids = tokens['input_ids'].clone().squeeze()
+                labels = input_ids.clone()
+                
+                # Create mask for MLM: randomly mask mask_prob% of tokens
+                # Don't mask special tokens (pad, cls, sep, etc.)
+                probability_matrix = torch.full(labels.shape, self.mask_prob)
+                
+                # Don't mask special tokens
+                for special_token_id in self.special_tokens:
+                    special_token_mask = (input_ids == special_token_id)
+                    probability_matrix[special_token_mask] = 0.0
+                
+                # Create masked indices
+                masked_indices = torch.bernoulli(probability_matrix).bool()
+                
+                # Set labels to -100 for non-masked positions (so loss ignores them)
+                labels[~masked_indices] = -100
+                
+                # Replace masked input tokens with [MASK] token
+                input_ids[masked_indices] = self.mask_token_id
                 
                 return {
-                    'input_ids': tokens['input_ids'].squeeze(),
+                    'input_ids': input_ids,
                     'attention_mask': tokens['attention_mask'].squeeze(),
-                    'labels': labels.squeeze()
+                    'labels': labels
                 }
         
         dataset = GPNDataset(training_data, self.tokenizer, self.config.get('max_length', 512))
@@ -206,13 +297,17 @@ class GPNPreTrainer:
         logger.info("="*50)
         
         self.load_model_and_tokenizer()
-        training_data = self.load_training_data()
+        training_data, test_data = self.load_training_data()
+        if training_data is None:
+            return False
+        
         data_loader = self.create_dataset(training_data)
         self.setup_training(data_loader)
         self.train()
         
         logger.info("="*50)
         logger.info("TRAINING COMPLETE!")
+        logger.info(f"Test set saved for evaluation: {self.output_dir / 'test_data.json'}")
         logger.info("="*50)
         return True
 
@@ -230,7 +325,9 @@ def create_config(data_path, output_dir, model_name, epochs, batch_size, lr):
         "learning_rate": lr,
         "warmup_steps": 500,
         "weight_decay": 0.01,
-        "logging_steps": 100
+        "logging_steps": 100,
+        "test_size": 0.2,  # 80/20 split (train/test)
+        "random_state": 42  # For reproducible split
     }
 
 

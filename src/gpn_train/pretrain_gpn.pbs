@@ -1,13 +1,12 @@
 #!/bin/bash
 #PBS -N gpn_pretrain
 #PBS -l select=1:ncpus=4:mem=16GB:ngpus=1
-#PBS -l walltime=2:00:00
+#PBS -l walltime=4:00:00
 #PBS -j oe
 #PBS -M z5618581@unsw.edu.au
 #PBS -m ae
 
 # Load required modules
-module load apptainer
 module load cuda
 
 # Set environment variables - use project local cache
@@ -16,7 +15,7 @@ export TRANSFORMERS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/c
 export HF_DATASETS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache/datasets
 
 # Navigate to working directory
-cd /home/z5618581/capstone-project-25t3-9900-f09c-donut/src
+cd /home/z5618581/capstone-project-25t3-9900-f09c-donut
 
 # Print start information
 echo "=================================================="
@@ -35,12 +34,12 @@ echo ""
 # Run pre-training
 echo "Starting GPN pre-training..."
 
-apptainer exec --nv /srv/scratch/$USER/images/p3.sif python3 pre_train.py \
-    --data ../data/gpn_preprocessing_results.json \
-    --output ../output/gpn_pretrained \
+apptainer exec --nv /srv/scratch/$USER/images/p3.sif python3 src/gpn_train/pre_train.py \
+    --data data/human_gpn_preprocessing_results.json \
+    --output output/human_gpn_pretrained_real_gpn \
     --model songlab/gpn-brassicales \
-    --epochs 3 \
-    --batch-size 16 \
+    --epochs 2 \
+    --batch-size 8 \
     --lr 5e-5
 
 EXIT_CODE=$?
@@ -57,10 +56,13 @@ if [ $EXIT_CODE -eq 0 ]; then
     echo "Status: SUCCESS ?"
     echo ""
     echo "Output files:"
-    ls -lh ../output/gpn_pretrained/
+    ls -lh output/human_gpn_pretrained_real_gpn/
     echo ""
     echo "Training metrics:"
-    cat ../output/gpn_pretrained/metrics.json 2>/dev/null || echo "Metrics file not found"
+    cat output/human_gpn_pretrained_real_gpn/training_metrics.json 2>/dev/null || echo "Metrics file not found"
+    echo ""
+    echo "Test data saved:"
+    ls -lh output/human_gpn_pretrained_real_gpn/test_data.json 2>/dev/null || echo "test_data.json not found"
 else
     echo "Status: FAILED ?"
 fi
