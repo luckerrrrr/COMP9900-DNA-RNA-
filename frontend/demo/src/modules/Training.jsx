@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ClassifierSection from "../components/training/ClassifierSection";
 import HyperparameterSection from "../components/training/HyperparameterSection";
+import { FcTreeStructure, FcSettings } from "react-icons/fc";
 
 export default function Module4Training() {
   const [activeSection, setActiveSection] = useState(1);
@@ -10,13 +11,13 @@ export default function Module4Training() {
     {
       id: 1,
       name: "Classifier",
-      icon: "📊",
+      icon: <FcTreeStructure />,
       subtitle: "Classification Head",
     },
     {
       id: 2,
       name: "Fine-tuning",
-      icon: "⚙️",
+      icon: <FcSettings />,
       subtitle: "Hyperparameters",
     },
   ];
