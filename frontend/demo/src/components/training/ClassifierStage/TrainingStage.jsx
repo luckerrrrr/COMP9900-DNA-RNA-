@@ -176,7 +176,7 @@ export default function TrainingStage() {
           background: "rgba(0, 212, 255, 0.05)",
           borderRadius: "10px",
           textAlign: "center",
-          fontSize: "14px",
+          fontSize: "16px",
           color: "rgba(255, 255, 255, 0.8)",
           lineHeight: "1.6",
         }}

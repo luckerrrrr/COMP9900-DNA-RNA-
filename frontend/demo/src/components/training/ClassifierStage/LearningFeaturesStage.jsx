@@ -32,7 +32,7 @@ export default function LearningFeaturesStage() {
           gap: "20px",
         }}
       >
-        {/* lncRNA features */}
+        {/* Conserved lncRNA features */}
         <motion.div
           initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
@@ -62,37 +62,37 @@ export default function LearningFeaturesStage() {
               marginBottom: "20px",
             }}
           >
-            lncRNA Features
+            Conserved lncRNA (Class 1)
           </div>
 
           <div
             style={{ display: "flex", flexDirection: "column", gap: "16px" }}
           >
             <FeatureItem
-              label="Conservation"
-              value="0.89"
+              label="Cross-species Similarity"
+              value="High"
               stars={5}
               color="#00ff88"
               delay={0.4}
             />
             <FeatureItem
-              label="Coding Ability"
-              value="None"
-              icon="❌"
+              label="Evolutionary Pressure"
+              value="Strong"
+              icon="🔒"
               color="#00ff88"
               delay={0.6}
             />
             <FeatureItem
-              label="Length"
-              value="2000 bp"
-              icon="📏"
+              label="Sequence Pattern"
+              value="Preserved"
+              icon="✓"
               color="#00ff88"
               delay={0.8}
             />
           </div>
         </motion.div>
 
-        {/* mRNA features */}
+        {/* Non-conserved lncRNA features */}
         <motion.div
           initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
@@ -122,30 +122,30 @@ export default function LearningFeaturesStage() {
               marginBottom: "20px",
             }}
           >
-            mRNA Features
+            Non-conserved lncRNA (Class 0)
           </div>
 
           <div
             style={{ display: "flex", flexDirection: "column", gap: "16px" }}
           >
             <FeatureItem
-              label="Conservation"
-              value="0.23"
+              label="Cross-species Similarity"
+              value="Low"
               stars={1}
               color="#ff6b9d"
               delay={0.4}
             />
             <FeatureItem
-              label="Coding Ability"
-              value="Yes"
-              icon="✓"
+              label="Evolutionary Pressure"
+              value="Weak"
+              icon="🔓"
               color="#ff6b9d"
               delay={0.6}
             />
             <FeatureItem
-              label="Length"
-              value="1500 bp"
-              icon="📏"
+              label="Sequence Pattern"
+              value="Variable"
+              icon="~"
               color="#ff6b9d"
               delay={0.8}
             />
@@ -185,29 +185,12 @@ export default function LearningFeaturesStage() {
             lineHeight: "1.7",
           }}
         >
-          <strong style={{ color: "#00ff88" }}>High Conservation</strong> +{" "}
-          <strong style={{ color: "#00ff88" }}>No Coding</strong> ={" "}
-          <strong style={{ color: "#00ff88" }}>lncRNA</strong>
+          <strong style={{ color: "#00ff88" }}>
+            High Cross-species Similarity
+          </strong>{" "}
+          + <strong style={{ color: "#00ff88" }}>Preserved Patterns</strong> ={" "}
+          <strong style={{ color: "#00ff88" }}>lncRNA Conserved</strong>
         </div>
-      </motion.div>
-
-      {/* Caption */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.6 }}
-        style={{
-          padding: "16px",
-          background: "rgba(0, 212, 255, 0.05)",
-          borderRadius: "10px",
-          textAlign: "center",
-          fontSize: "14px",
-          color: "rgba(255, 255, 255, 0.8)",
-          lineHeight: "1.6",
-        }}
-      >
-        💡 The classifier learns patterns from labeled data: lncRNA has high
-        conservation but no coding ability, while mRNA codes for proteins.
       </motion.div>
     </motion.div>
   );

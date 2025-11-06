@@ -40,7 +40,7 @@ export default function Module4Training() {
           marginBottom: "20px",
         }}
       >
-        Training & Fine-tuning Pipeline
+        Classifier & Fine-tuning 
       </motion.h2>
 
 

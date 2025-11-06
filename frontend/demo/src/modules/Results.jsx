@@ -35,7 +35,7 @@ export default function Module5Results() {
         style={{
           textAlign: "center",
           marginBottom: "60px",
-          marginTop: "3000px",
+          marginTop: "1000px",
         }}
       >
         <h1 style={{
@@ -47,7 +47,6 @@ export default function Module5Results() {
           justifyContent: "center",
           gap: "16px"
         }}>
-          <FaLightbulb style={{ color: "#ffd700" }} />
           Results presentation and insight analysis
         </h1>
         <p style={{

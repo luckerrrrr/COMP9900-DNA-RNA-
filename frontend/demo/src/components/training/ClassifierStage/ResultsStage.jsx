@@ -137,7 +137,11 @@ export default function ResultsStage() {
             detail="High conservation"
           />
           <LearnedFeature icon="🔍" text="Identify" detail="Coding ability" />
-          <LearnedFeature icon="✅" text="Classify" detail="lncRNA vs mRNA" />
+          <LearnedFeature
+            icon="✅"
+            text="Classify"
+            detail="Conservation (0 or 1)"
+          />
         </div>
       </motion.div>
     </motion.div>

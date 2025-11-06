@@ -18,7 +18,7 @@ export default function Module3Model() {
         padding: "40px 20px",
         color: "#fff",
         overflow: "auto",
-        marginTop: "100px",
+        marginTop: "200px",
       }}
     >
       {/* Header */}
@@ -30,7 +30,7 @@ export default function Module3Model() {
       >
         <h1
           style={{
-            fontSize: "clamp(24px, 3.5vw, 36px)",
+            fontSize: "clamp(32px, 5vw, 48px)",
             fontWeight: "bold",
             marginBottom: "8px",
           }}

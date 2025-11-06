@@ -49,7 +49,7 @@ export default function LabelingStage() {
       >
         <div
           style={{
-            fontSize: "14px",
+            fontSize: "18px",
             color: "rgba(255, 255, 255, 0.6)",
             marginBottom: "16px",
             textAlign: "center",
@@ -75,7 +75,7 @@ export default function LabelingStage() {
               <div
                 style={{
                   width: "80px",
-                  fontSize: "13px",
+                  fontSize: "20px",
                   color: "rgba(255, 255, 255, 0.6)",
                   fontWeight: "600",
                 }}
@@ -136,11 +136,11 @@ export default function LabelingStage() {
           </div>
           <div
             style={{
-              fontSize: "13px",
+              fontSize: "16px",
               color: "rgba(255, 255, 255, 0.7)",
             }}
           >
-            This region is important → Label as lncRNA
+            This lncRNA region is conserved → Classify as Conserved
           </div>
         </motion.div>
       </div>
@@ -172,31 +172,12 @@ export default function LabelingStage() {
         </div>
         <div
           style={{
-            fontSize: "13px",
+            fontSize: "16px",
             color: "rgba(255, 255, 255, 0.7)",
           }}
         >
           Conserved region marked by biologists
         </div>
-      </motion.div>
-
-      {/* Caption */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 2 }}
-        style={{
-          padding: "16px",
-          background: "rgba(0, 212, 255, 0.05)",
-          borderRadius: "10px",
-          textAlign: "center",
-          fontSize: "14px",
-          color: "rgba(255, 255, 255, 0.8)",
-          lineHeight: "1.6",
-        }}
-      >
-        💡 Biologists find conserved regions by comparing sequences across
-        species. These regions are labeled as lncRNA for training.
       </motion.div>
     </motion.div>
   );

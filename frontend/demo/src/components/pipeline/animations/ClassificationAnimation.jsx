@@ -388,7 +388,7 @@ export default function ClassificationAnimation() {
               padding: "3px 10px",
               background: "#ffd700",
               borderRadius: "10px",
-              fontSize: "10px",
+              fontSize: "14px",
               fontWeight: "bold",
               color: "#000",
             }}
@@ -404,8 +404,8 @@ export default function ClassificationAnimation() {
               marginBottom: "10px",
             }}
           >
-           <TbMathFunction size={24} color="#ffd700" />
-  
+            <TbMathFunction size={24} color="#ffd700" />
+
             <div>
               <div
                 style={{
@@ -505,14 +505,14 @@ export default function ClassificationAnimation() {
                   color: "rgba(255, 255, 255, 0.5)",
                 }}
               >
-                Softmax probability
+                Binary classification (0 or 1)
               </div>
             </div>
           </div>
 
           {/* Probability bars - compact */}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {/* lncRNA */}
+            {/* Conserved (Class 1) */}
             <div>
               <div
                 style={{
@@ -528,7 +528,7 @@ export default function ClassificationAnimation() {
                     fontWeight: "600",
                   }}
                 >
-                  ✅ lncRNA
+                  ✅ lncRNA Conserved (1)
                 </span>
                 <motion.span
                   animate={{ opacity: stage >= 3 ? 1 : 0.3 }}
@@ -562,7 +562,7 @@ export default function ClassificationAnimation() {
               </div>
             </div>
 
-            {/* mRNA */}
+            {/* Non-conserved (Class 0) */}
             <div>
               <div
                 style={{
@@ -578,7 +578,7 @@ export default function ClassificationAnimation() {
                     fontWeight: "600",
                   }}
                 >
-                  ❌ mRNA
+                  ❌ lncRNA Non-conserved (0)
                 </span>
                 <motion.span
                   animate={{ opacity: stage >= 3 ? 1 : 0.3 }}
@@ -634,7 +634,7 @@ export default function ClassificationAnimation() {
                   color: "#00ff88",
                 }}
               >
-                Prediction: lncRNA ✓
+                Prediction: lncRNA Conserved (Class 1) ✓
               </div>
             </motion.div>
           )}
@@ -662,7 +662,8 @@ export default function ClassificationAnimation() {
         {stage === 1 &&
           "Frozen encoder extracts features without weight updates"}
         {stage === 2 && "Linear classifier maps features to binary output"}
-        {stage === 3 && "Softmax: lncRNA (94.2%) vs mRNA (5.8%)"}
+        {stage === 3 &&
+          "Softmax output: Conserved (94.2%) vs Non-conserved (5.8%)"}
       </motion.div>
     </div>
   );
