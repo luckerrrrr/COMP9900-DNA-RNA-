@@ -334,10 +334,10 @@ def create_config(data_path, output_dir, model_name, epochs, batch_size, lr):
 def main():
     
     parser = argparse.ArgumentParser(description="GPN Pre-training")
-    parser.add_argument("--data", default="../data/gpn_preprocessing_results.json", help="Training data")
-    parser.add_argument("--output", default="../output/gpn_pretrained", help="Output directory")
+    parser.add_argument("--data", default="data/human_gpn_preprocessing_results.json", help="Training data")
+    parser.add_argument("--output", default="output/human_gpn_pretrained_real_gpn", help="Output directory")
     parser.add_argument("--model", default="songlab/gpn-brassicales", help="Model name")
-    parser.add_argument("--epochs", type=int, default=3, help="Epochs")
+    parser.add_argument("--epochs", type=int, default=2, help="Epochs")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate")
     parser.add_argument("--config", help="Config JSON (overrides other args)")

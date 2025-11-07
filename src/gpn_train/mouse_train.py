@@ -356,13 +356,13 @@ def create_config(human_model_path, data_path, output_dir, epochs, batch_size, l
 def main():
     
     parser = argparse.ArgumentParser(description="GPN Mouse Fine-tuning (Transfer Learning)")
-    parser.add_argument("--human-model", default="../output/human_gpn_pretrained_real_gpn", 
+    parser.add_argument("--human-model", default="output/human_gpn_pretrained_real_gpn", 
                        help="Path to human-pretrained GPN model")
-    parser.add_argument("--data", default="../data/mouse_gpn_preprocessing_results.json", 
+    parser.add_argument("--data", default="data/mouse_gpn_preprocessing_results.json", 
                        help="Mouse training data")
-    parser.add_argument("--output", default="../output/mouse_gpn_finetuned", 
+    parser.add_argument("--output", default="output/mouse_gpn_finetuned", 
                        help="Output directory")
-    parser.add_argument("--epochs", type=int, default=3, help="Epochs")
+    parser.add_argument("--epochs", type=int, default=2, help="Epochs")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate")
     parser.add_argument("--config", help="Config JSON (overrides other args)")

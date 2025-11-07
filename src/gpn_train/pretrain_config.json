@@ -1,6 +1,6 @@
 {
   "model_name": "songlab/gpn-brassicales",
-  "data_path": "../data/gpn_preprocessing_results.json",
+  "data_path": "../data/human_gpn_preprocessing_results.json",
   "output_dir": "../output/gpn_pretrained",
   "cache_dir": "../cache",
   "max_length": 512,

@@ -529,7 +529,7 @@ class MouseUMAPGenerator:
         
         plt.xlabel('UMAP 1')
         plt.ylabel('UMAP 2')
-        plt.title('Mouse GPN Model - UMAP by Gene Type')
+        plt.title('UMAP projection of GPN embeddings (fine-grained IncRNA scatter)')
         
         # Create legend with Patch style
         patches = [
