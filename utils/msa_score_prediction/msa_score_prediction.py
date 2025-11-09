@@ -26,9 +26,9 @@ import torch.nn.functional as F
 
 from data.loader import GenomeLoader
 from gpn.data import Tokenizer
-from utils.msa_score_prediction.monitor import MemoryMonitor
-from utils.msa_score_prediction.gencode_extracter import GencodeExtractor
-from utils.msa_score_prediction.conservation_visualizer import ConservationVisualizer
+from monitor import MemoryMonitor
+from gencode_extracter import GencodeExtractor
+from conservation_visualizer import ConservationVisualizer
 
 
 # ==================== Global Configuration Parameters ====================
@@ -37,7 +37,7 @@ WIN = 512
 BATCH_SIZE = 64
 
 # Path configuration
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 USER = os.environ.get("USER", "unknown")
 CACHE_DIR = f"/srv/scratch/{USER}/hf_cache"
 GTF_PATH = "dataset/gencode.v38.basic.annotation.gtf"
