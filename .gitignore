@@ -16,3 +16,6 @@ capstone-container-run*
 
 # Output
 results/
+
+# Ignore .DS_Store files recursively
+**/.DS_Store
