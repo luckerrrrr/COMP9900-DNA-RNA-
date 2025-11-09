@@ -26,9 +26,9 @@ import torch.nn.functional as F
 
 from data.loader import GenomeLoader
 from gpn.data import Tokenizer
-from utils.monitor import MemoryMonitor
-from utils.gencode_extracter import GencodeExtractor
-from utils.conservation_visualizer import ConservationVisualizer
+from utils.msa_score_prediction.monitor import MemoryMonitor
+from utils.msa_score_prediction.gencode_extracter import GencodeExtractor
+from utils.msa_score_prediction.conservation_visualizer import ConservationVisualizer
 
 
 # ==================== Global Configuration Parameters ====================
@@ -47,7 +47,7 @@ VIS_OUTPUT_DIR = PROJECT_ROOT / "results" / "conservation_test"
 
 # Inference parameters
 DEFAULT_CHROM = "1"
-MAX_DEBUG_GENES = 1
+MAX_DEBUG_GENES = None
 PREVIEW_ROWS = 30
 
 # Data type optimization mapping

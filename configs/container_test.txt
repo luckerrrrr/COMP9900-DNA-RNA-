@@ -1,1 +1,1 @@
-utils/msa_score_prediction.py
+utils/msa_score_prediction/msa_score_prediction.py
