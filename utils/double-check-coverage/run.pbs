@@ -1,0 +1,88 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=16:mem=64gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -N compare_multiz
+
+set -euo pipefail
+
+cd "$PBS_O_WORKDIR"
+
+############################ container ############################
+
+SIF="/srv/scratch/$USER/images/p3.sif"
+
+DEF="container/p3.def"
+
+RUNCONF="compare_multiz_gencode_hpc.py"
+
+REQ_FILE="requirements.txt"
+HASH_FILE="${SIF}.build_hash"
+
+if [ -f "$REQ_FILE" ]; then
+  CUR_HASH=$(md5sum "$REQ_FILE" | awk '{print $1}')
+else
+  CUR_HASH="none"
+fi
+
+NEED_REBUILD=false
+if [ ! -f "$SIF" ]; then
+  echo "[build] SIF not found, will build."
+  NEED_REBUILD=true
+elif [ ! -f "$HASH_FILE" ]; then
+  echo "[build] No previous build hash, will rebuild."
+  NEED_REBUILD=true
+else
+  OLD_HASH=$(cat "$HASH_FILE")
+  if [ "$CUR_HASH" != "$OLD_HASH" ]; then
+    echo "[build] requirements.txt changed, will rebuild."
+    NEED_REBUILD=true
+  else
+    echo "[build] Image up-to-date (hash matched)."
+  fi
+fi
+
+export APPTAINER_TMPDIR="/srv/scratch/$USER/apptainer_tmp"
+export APPTAINER_CACHEDIR="/srv/scratch/$USER/apptainer_cache"
+mkdir -p "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR" "$(dirname "$SIF")"
+
+if [ "$NEED_REBUILD" = true ]; then
+  echo "[build] Building $SIF ..."
+  if [ -f "$SIF" ]; then
+    rm -f "$SIF"
+  fi
+  apptainer build "$SIF" "$DEF"
+  echo "$CUR_HASH" > "$HASH_FILE"
+fi
+
+HF_CACHE_DIR="/srv/scratch/$USER/hf_cache"
+mkdir -p "$HF_CACHE_DIR"
+
+PIP_CACHE_DIR="/srv/scratch/$USER/pip_cache"
+PYTHONUSERBASE="/srv/scratch/$USER/pyuserbase"
+mkdir -p "$PIP_CACHE_DIR" "$PYTHONUSERBASE"
+
+BIND_MOUNTS="$PWD:$PWD,$HF_CACHE_DIR:$HF_CACHE_DIR,$PIP_CACHE_DIR:$PIP_CACHE_DIR,$PYTHONUSERBASE:$PYTHONUSERBASE"
+
+PROJECT_ROOT="$PWD"
+PYTHON_SRC="$PROJECT_ROOT"
+PYTHON_DATA="$PROJECT_ROOT/data"
+PYTHONPATH="${PYTHONPATH:-}"
+export PYTHONPATH="$PROJECT_ROOT:$PYTHON_SRC:$PYTHON_DATA:$PYTHONPATH"
+
+echo "[env] Project root: $PROJECT_ROOT"
+echo "[env] PYTHONPATH: $PYTHONPATH"
+
+SCRIPT_ARGS="--gtf gencode.v38.long_noncoding_RNAs.gtf \
+             --output coverage_summary.tsv \
+             --msa_version 89 \
+             --streaming True"
+
+apptainer run --nv \
+  --bind "$BIND_MOUNTS" \
+  --env HF_HOME="$HF_CACHE_DIR" \
+  --env HF_DATASETS_CACHE="$HF_CACHE_DIR/datasets" \
+  --env PIP_CACHE_DIR="$PIP_CACHE_DIR" \
+  --env PYTHONUSERBASE="$PYTHONUSERBASE" \
+  --env PYTHONPATH="$PYTHONPATH" \
+  "$SIF" "$RUNCONF" $SCRIPT_ARGS
