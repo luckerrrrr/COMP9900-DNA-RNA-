@@ -1,10 +1,21 @@
+# Python cache directories
 .cache/
+/cache/**
 __pycache__/
 
-capstone-container-run*
-logs/
-*_logs/
-
+# Singularity image files
 container/p3.sif
 
-/cache/**
+# data files
+dataset/
+
+# Log files
+logs/
+*_logs/
+capstone-container-run*
+
+# Output
+results/
+
+# Ignore .DS_Store files recursively
+**/.DS_Store

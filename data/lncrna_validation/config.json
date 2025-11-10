@@ -1,0 +1,5 @@
+{
+  "gencode_path": "../../dataset/gencode.v38.basic.annotation.gtf",
+  "sample_size": 10000,
+  "output_dir": "."
+}

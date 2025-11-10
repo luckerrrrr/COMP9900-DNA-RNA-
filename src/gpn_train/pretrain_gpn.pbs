@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -N gpn_pretrain
+#PBS -l select=1:ncpus=4:mem=16GB:ngpus=1
+#PBS -l walltime=4:00:00
+#PBS -j oe
+#PBS -M z5618581@unsw.edu.au
+#PBS -m ae
+
+# Load required modules
+module load cuda
+
+# Set environment variables - use project local cache
+export HF_HOME=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export TRANSFORMERS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export HF_DATASETS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache/datasets
+
+# Navigate to working directory
+cd /home/z5618581/capstone-project-25t3-9900-f09c-donut
+
+# Print start information
+echo "=================================================="
+echo "GPN Model Pre-training Job (GPU Accelerated)"
+echo "=================================================="
+echo "Job ID: $PBS_JOBID"
+echo "Job Name: $PBS_JOBNAME"
+echo "Start Time: $(date)"
+echo "Working Directory: $(pwd)"
+echo ""
+echo "GPU Information:"
+nvidia-smi --query-gpu=gpu_name,memory.total --format=csv,noheader
+echo "=================================================="
+echo ""
+
+# Run pre-training
+echo "Starting GPN pre-training..."
+
+apptainer exec --nv /srv/scratch/$USER/images/p3.sif python3 src/gpn_train/pre_train.py \
+    --data data/human_gpn_preprocessing_results.json \
+    --output output/human_gpn_pretrained_real_gpn \
+    --model songlab/gpn-brassicales \
+    --epochs 2 \
+    --batch-size 8 \
+    --lr 5e-5
+
+EXIT_CODE=$?
+
+# Print completion information
+echo ""
+echo "=================================================="
+echo "Job Completion Information"
+echo "=================================================="
+echo "End Time: $(date)"
+echo "Exit Code: $EXIT_CODE"
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "Status: SUCCESS ?"
+    echo ""
+    echo "Output files:"
+    ls -lh output/human_gpn_pretrained_real_gpn/
+    echo ""
+    echo "Training metrics:"
+    cat output/human_gpn_pretrained_real_gpn/training_metrics.json 2>/dev/null || echo "Metrics file not found"
+    echo ""
+    echo "Test data saved:"
+    ls -lh output/human_gpn_pretrained_real_gpn/test_data.json 2>/dev/null || echo "test_data.json not found"
+else
+    echo "Status: FAILED ?"
+fi
+echo "=================================================="
+
+exit $EXIT_CODE
+

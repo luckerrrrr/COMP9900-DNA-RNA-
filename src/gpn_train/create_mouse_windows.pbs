@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -N create_mouse_windows
+#PBS -l select=1:ncpus=4:mem=16gb
+#PBS -l walltime=1:00:00
+#PBS -j oe
+#PBS -o create_mouse_windows.log
+#PBS -M z5618581@unsw.edu.au
+#PBS -m ae
+
+# Load modules
+module load singularity 2>/dev/null || true
+
+# Set working directory
+cd /home/z5618581/capstone-project-25t3-9900-f09c-donut || exit 1
+
+echo "=========================================="
+echo "Create Mouse chr1_windows.csv"
+echo "=========================================="
+echo "Job ID: $PBS_JOBID"
+echo "Node: $(hostname)"
+echo "Start time: $(date)"
+echo "Working directory: $(pwd)"
+echo ""
+
+# Check if container exists
+CONTAINER="/srv/scratch/$USER/images/p3.sif"
+if [ ! -f "$CONTAINER" ]; then
+    echo "Error: Container not found: $CONTAINER"
+    exit 1
+fi
+echo "? Container found: $CONTAINER"
+
+# Check if GTF exists
+GTF_PATH="dataset/mouse/gencode.vM38.basic.annotation.gtf"
+if [ ! -f "$GTF_PATH" ]; then
+    echo "Error: GTF not found: $GTF_PATH"
+    exit 1
+fi
+echo "? GTF found: $GTF_PATH"
+
+echo ""
+echo "=========================================="
+echo "Generating chr1_windows.csv from mouse GTF..."
+echo "=========================================="
+echo ""
+
+# Run the script inside container
+apptainer exec "$CONTAINER" python3 src/gpn_train/create_mouse_windows.py
+
+EXIT_CODE=$?
+
+echo ""
+echo "=========================================="
+echo "Job completed at $(date)"
+echo "Exit code: $EXIT_CODE"
+echo "=========================================="
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo ""
+    echo "? Window generation successful!"
+    echo ""
+    echo "Output file: mouse_chr1_windows.csv"
+    echo ""
+    
+    # Show output file
+    if [ -f "mouse_chr1_windows.csv" ]; then
+        echo "File info:"
+        ls -lh mouse_chr1_windows.csv
+        echo ""
+        echo "First 5 lines:"
+        head -5 mouse_chr1_windows.csv
+        echo ""
+        echo "Total lines:"
+        wc -l mouse_chr1_windows.csv
+    fi
+else
+    echo ""
+    echo "? Window generation failed!"
+    echo "Check the log above for errors"
+fi
+
+exit $EXIT_CODE
+

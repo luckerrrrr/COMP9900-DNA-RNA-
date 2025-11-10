@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -N gpn_pretrain
+#PBS -l select=1:ncpus=4:mem=16GB:ngpus=1
+#PBS -l walltime=2:00:00
+#PBS -j oe
+#PBS -M z5618581@unsw.edu.au
+#PBS -m ae
+
+# Load required modules
+module load apptainer
+module load cuda
+
+# Set environment variables - use project local cache
+export HF_HOME=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export TRANSFORMERS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export HF_DATASETS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache/datasets
+
+# Navigate to working directory
+cd /home/z5618581/capstone-project-25t3-9900-f09c-donut/src
+
+# Print start information
+echo "=================================================="
+echo "GPN Model Pre-training Job (GPU Accelerated)"
+echo "=================================================="
+echo "Job ID: $PBS_JOBID"
+echo "Job Name: $PBS_JOBNAME"
+echo "Start Time: $(date)"
+echo "Working Directory: $(pwd)"
+echo ""
+echo "GPU Information:"
+nvidia-smi --query-gpu=gpu_name,memory.total --format=csv,noheader
+echo "=================================================="
+echo ""
+
+# Run pre-training
+echo "Starting GPN pre-training..."
+
+apptainer exec --nv /srv/scratch/$USER/images/p3.sif python3 pre_train.py \
+    --data ../data/gpn_preprocessing_results.json \
+    --output ../output/gpn_pretrained \
+    --model songlab/gpn-brassicales \
+    --epochs 3 \
+    --batch-size 16 \
+    --lr 5e-5
+
+EXIT_CODE=$?
+
+# Print completion information
+echo ""
+echo "=================================================="
+echo "Job Completion Information"
+echo "=================================================="
+echo "End Time: $(date)"
+echo "Exit Code: $EXIT_CODE"
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "Status: SUCCESS ?"
+    echo ""
+    echo "Output files:"
+    ls -lh ../output/gpn_pretrained/
+    echo ""
+    echo "Training metrics:"
+    cat ../output/gpn_pretrained/metrics.json 2>/dev/null || echo "Metrics file not found"
+else
+    echo "Status: FAILED ?"
+fi
+echo "=================================================="
+
+exit $EXIT_CODE
+
