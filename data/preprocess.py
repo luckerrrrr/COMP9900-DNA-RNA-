@@ -227,7 +227,7 @@ class GencodeWindowGenerator:
                 mean_val = self.wig.get_window_mean(w["chr"], w["start"], w["end"])
                 rec["mean_phastCons"] = 0.0 if mean_val is None else mean_val
 
-            print(rec)
+            # print(rec)
             # optional progress print every 10000
             if (i + 1) % 10000 == 0:
                 print(f"  processed {i+1}/{len(windows_meta)} → kept {len(results)} (skipped {skipped})")
