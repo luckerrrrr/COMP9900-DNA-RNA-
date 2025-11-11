@@ -215,7 +215,7 @@ class GencodeWindowGenerator:
                     print(f"  1processed {i+1}/{len(windows_meta)} → kept {len(results)} (skipped {skipped})")
                 continue
             rec = {
-                "chr": w["chr"],
+                "chrom": w["chr"],
                 "start": w["start"],
                 "end": w["end"],
                 "gene_id": w.get("gene_id", "") or "",
