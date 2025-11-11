@@ -228,6 +228,7 @@ class GencodeWindowGenerator:
                 rec["mean_phastCons"] = 0.0 if mean_val is None else mean_val
 
             # print(rec)
+            results.append(rec)
             # optional progress print every 10000
             if (i + 1) % 10000 == 0:
                 print(f"  processed {i+1}/{len(windows_meta)} → kept {len(results)} (skipped {skipped})")
