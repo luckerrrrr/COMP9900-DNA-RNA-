@@ -1,0 +1,102 @@
+#!/bin/bash
+#PBS -N mouse_gpn_train
+#PBS -l select=1:ncpus=4:mem=16gb:ngpus=1
+#PBS -l walltime=03:00:00
+#PBS -j oe
+#PBS -M z5618581@unsw.edu.au
+#PBS -m ae
+
+# GPN Mouse Fine-tuning (Transfer Learning from Human Model)
+# This script fine-tunes the human-pretrained GPN model on mouse genome data
+
+# Load required modules
+module load cuda
+
+# Set environment variables
+export HF_HOME=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export TRANSFORMERS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export HF_DATASETS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache/datasets
+
+cd /home/z5618581/capstone-project-25t3-9900-f09c-donut
+
+echo "=================================================================================="
+echo "GPN Mouse Fine-tuning (Transfer Learning)"
+echo "=================================================================================="
+echo "Start time: $(date)"
+echo "Node: $(hostname)"
+echo ""
+echo "GPU Information:"
+nvidia-smi --query-gpu=gpu_name,memory.total --format=csv,noheader
+echo ""
+echo "Strategy: Transfer Learning"
+echo "  1. Load human-pretrained GPN model"
+echo "  2. Fine-tune on mouse genome data"
+echo "  3. Leverage knowledge from human genome"
+echo "=================================================================================="
+
+# Check if human model exists
+HUMAN_MODEL="output/human_gpn_pretrained_real_gpn"
+if [ ! -d "$HUMAN_MODEL" ]; then
+    echo "Error: Human-pretrained model not found: $HUMAN_MODEL"
+    echo "Please train human model first using pretrain_gpn.pbs"
+    exit 1
+fi
+
+# Check if mouse data exists
+MOUSE_DATA="data/mouse_gpn_preprocessing_results.json"
+if [ ! -f "$MOUSE_DATA" ]; then
+    echo "Error: Mouse preprocessing data not found: $MOUSE_DATA"
+    echo "Please run mouse preprocessing first: qsub mouse_preprocessing.pbs"
+    exit 1
+fi
+
+echo ""
+echo "Configuration:"
+echo "  Human model: $HUMAN_MODEL"
+echo "  Mouse data: $MOUSE_DATA"
+echo "  Output: output/mouse_gpn_finetuned"
+echo "  Epochs: 2"
+echo "  Batch size: 8"
+echo "  Learning rate: 5e-5"
+echo "=================================================================================="
+echo ""
+echo "Starting mouse fine-tuning..."
+
+# Run mouse fine-tuning using apptainer
+apptainer exec --nv /srv/scratch/$USER/images/p3.sif python3 src/gpn_train/mouse_train.py \
+    --human-model "$HUMAN_MODEL" \
+    --data "$MOUSE_DATA" \
+    --output "output/mouse_gpn_finetuned" \
+    --epochs 2 \
+    --batch-size 8 \
+    --lr 5e-5
+
+EXIT_CODE=$?
+
+echo "=================================================================================="
+echo "End time: $(date)"
+echo "Exit code: $EXIT_CODE"
+echo "=================================================================================="
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo ""
+    echo "? Mouse fine-tuning completed successfully!"
+    echo ""
+    echo "Output files:"
+    ls -lh output/mouse_gpn_finetuned/
+    echo ""
+    echo "Metrics:"
+    cat output/mouse_gpn_finetuned/metrics.json
+    echo ""
+    echo "Next steps:"
+    echo "  1. Evaluate mouse model: qsub src/gpn_train/eval_mouse.pbs"
+    echo "  2. Compare human vs mouse performance"
+    echo "  3. Extract embeddings: qsub src/gpn_train/extract_embeddings_mouse.pbs"
+else
+    echo ""
+    echo "? Mouse fine-tuning failed with exit code: $EXIT_CODE"
+    echo "Check the logs above for error details"
+fi
+
+echo "=================================================================================="
+

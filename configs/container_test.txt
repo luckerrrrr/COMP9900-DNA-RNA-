@@ -1,1 +1,2 @@
-src/gpn_test.py
+utils/msa_score_prediction/msa_score_prediction.py
+

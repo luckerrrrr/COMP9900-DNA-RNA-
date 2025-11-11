@@ -1,0 +1,17 @@
+{
+  "human_model_path": "output/human_gpn_pretrained_real_gpn",
+  "data_path": "data/mouse_gpn_preprocessing_results.json",
+  "output_dir": "output/mouse_gpn_finetuned",
+  "cache_dir": "cache",
+  "max_length": 512,
+  "batch_size": 8,
+  "num_epochs": 2,
+  "learning_rate": 5e-05,
+  "warmup_steps": 500,
+  "weight_decay": 0.01,
+  "logging_steps": 100,
+  "test_size": 0.2,
+  "random_state": 42,
+  "_comment": "Mouse fine-tuning configuration - Transfer learning from human-pretrained model"
+}
+

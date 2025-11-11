@@ -1,0 +1,44 @@
+# ======================================================
+# GPN-MSA Deep Learning Pipeline Requirements (Katana Compatible)
+# ======================================================
+
+# --- Core Deep Learning ---
+#torch>=2.1.0
+transformers==4.39.3
+datasets==2.13.1
+pyarrow<13.0.0
+
+
+# --- Scientific Computing ---
+numpy>=1.24.0
+pandas>=2.1.0
+scikit-learn==1.3.0
+
+# --- Visualization ---
+matplotlib>=3.8.0
+seaborn>=0.13.0
+umap-learn>=0.5.5
+
+# --- Utilities ---
+tqdm>=4.66.0
+joblib>=1.3.2
+packaging>=23.0
+
+# --- GPN Hidden Dependencies ---
+biopython==1.81
+bioframe==0.4.0
+zarr==2.14.2
+fsspec==2023.5.0
+
+# --- Optional: only if you analyze .bigWig conservation scores ---
+pyBigWig>=0.3.22
+
+# --- Hugging Face core dependency ---
+huggingface_hub==0.19.3
+
+# ============================================================
+# Notes:
+# - torch is preinstalled in the base image (no need to add)
+# - datasets is required to load songlab/gpn-msa-sapiens-dataset
+# - umap-learn + matplotlib + seaborn are used for visualization
+# ============================================================
