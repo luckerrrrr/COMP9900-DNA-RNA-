@@ -21,17 +21,17 @@ from src.config import MIDDLE_RESULT_DIR, GTF, FASTA, CHROM, CONFIG, PHASTCONS_F
 
 # ------------------ 静态配置区（改这里） ------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-INPUT_PATH = f"{PROJECT_ROOT}/dataset/FineTuningSet1.head.bed"   # 源文件（tab 分隔或空白分隔），可带 header 或无 header
+INPUT_PATH = f"{PROJECT_ROOT}/dataset/FineTuningSet2.txt"   # 源文件（tab 分隔或空白分隔），可带 header 或无 header
 OUT_DIR = f"{MIDDLE_RESULT_DIR_OUT}/windows_out"
 WINDOW = 512
 STRIDE = 256
 START_BASE = 0   # 如果原始 start 是 1-based，改成 1，否则保持 0
 RANDOM_SEED = 42
-FLANK = 128   
+FLANK = 0
 
 # 输出文件名（在 OUT_DIR 下）
-OUT_WINDOWS_BED = "windows.bed"     # tab 无 header: chrom start end window_id label
-OUT_WINDOWS_CSV = "windows.csv"     # full csv with parent_id and label
+OUT_WINDOWS_BED = "windows_FineTuningSet2.bed"     # tab 无 header: chrom start end gene_id strand label
+OUT_WINDOWS_CSV = "windows_FineTuningSet2.csv"     # full csv with gene_id and label
 TRAIN_META = "train_meta.csv"
 VAL_META = "val_meta.csv"
 TEST_META = "test_meta.csv"
@@ -44,51 +44,85 @@ def ensure_outdir():
     os.makedirs(OUT_DIR, exist_ok=True)
 
 def read_input(path):
-    """尝试用多种方式读取输入文件，返回 DataFrame，列规范化： chrom,start,end,id,label 或 Conservation """
-    # 先尝试 tab 读取（常见）
-    df = pd.read_csv(path, sep='\t', engine='python', dtype=str)
+    """尝试用多种方式读取输入文件，返回 DataFrame，列规范化：
+       输出列为: chrom,start,end,gene_id,strand,label
+       特别处理：Conservation -> label, ID -> gene_id
+    """
+    # 先尝试以 tab 读取（有 header 的常见情况）
+    try:
+        df = pd.read_csv(path, sep='\t', engine='python', dtype=str)
+    except Exception:
+        # 兜底：用任意空白分隔读取（可能无 header）
+        df = pd.read_csv(path, sep=r'\s+', engine='python', header=0, dtype=str)
+
     cols = list(df.columns)
     lower = [c.lower() for c in cols]
-    # detect common header formats
+
+    # 必要列检测并选择列名（大小写不敏感）
     if 'chrom' in lower and 'start' in lower and 'end' in lower:
         chrom_col = cols[lower.index('chrom')]
         start_col = cols[lower.index('start')]
         end_col = cols[lower.index('end')]
-        # id could be 'id' or 'name' or 4th col
-        if 'id' in lower:
-            id_col = cols[lower.index('id')]
-        elif 'name' in lower:
-            id_col = cols[lower.index('name')]
-        else:
-            id_col = cols[3] if len(cols) >= 4 else cols[-2]
-        if 'label' in lower:
-            label_col = cols[lower.index('label')]
-        elif 'conservation' in lower:
-            label_col = cols[lower.index('conservation')]
-        else:
-            label_col = cols[-1]
     else:
-        # maybe whitespace-separated without header; try fallback: assume columns:
-        # chrom start end id label  OR index chrom start end id label
-        df2 = pd.read_csv(path, sep=r'\s+', engine='python', header=None, dtype=str)
-        # prefer 5 columns (chrom,start,end,id,label)
-        if df2.shape[1] >= 5:
-            # if first col is numeric index -> drop it
-            if df2.shape[1] >= 6 and all(x.isdigit() for x in df2.iloc[:10,0].astype(str)):
-                df2 = df2.drop(columns=[0]).reset_index(drop=True)
-            df2.columns = ['chrom','start','end','id','label'] + list(df2.columns[5:])
-            return df2[['chrom','start','end','id','label']]
-        else:
-            raise RuntimeError("无法识别输入文件列，请检查格式或加 header。")
-    # build normalized df
+        raise RuntimeError("无法在输入文件中找到 chrom/start/end 列，请检查 header 或文件格式。")
+
+    # gene_id 列优先匹配常见名称（注意你的文件中是 ID）
+    gene_candidates = ('gene_id', 'id', 'name', 'gene', 'ID')
+    gene_col = None
+    for cand in gene_candidates:
+        if cand.lower() in lower:
+            gene_col = cols[lower.index(cand.lower())]
+            break
+    # 如果没找到，使用第4列作为 id
+    if gene_col is None:
+        gene_col = cols[3] if len(cols) >= 4 else cols[-2]
+
+    # strand 列（可选）
+    strand_col = None
+    for cand in ('strand',):
+        if cand in lower:
+            strand_col = cols[lower.index(cand)]
+            break
+
+    # conservation 列 -> label（可选）
+    cons_col = None
+    for cand in ('conservation', 'mean_phastcons'):
+        if cand in lower:
+            cons_col = cols[lower.index(cand)]
+            break
+
+    # 构造规范化的 DataFrame
     df2 = pd.DataFrame()
-    df2['chrom'] = df[chrom_col].astype(str).str.replace('^chr','', regex=True).apply(lambda x: x)
-    # numeric
+    # 去掉可能的 'chr' 前缀，保持与后续处理一致
+    df2['chrom'] = df[chrom_col].astype(str).str.replace('^chr', '', regex=True)
+    # 强制转换为 int
     df2['start'] = df[start_col].astype(int)
     df2['end'] = df[end_col].astype(int)
-    df2['id'] = df[id_col].astype(str)
-    df2['label'] = df[label_col].astype(str)
-    return df2[['chrom','start','end','id','label']]
+    df2['gene_id'] = df[gene_col].astype(str)
+
+    # strand 如果不存在则填 '.'
+    if strand_col is not None:
+        df2['strand'] = df[strand_col].astype(str)
+    else:
+        df2['strand'] = '.'
+
+    # label：优先把 Conservation 尝试转换为数值，否则保留原字符串
+    if cons_col is not None:
+        cons_series = pd.to_numeric(df[cons_col], errors='coerce')
+        if cons_series.notna().any():
+            df2['label'] = cons_series
+        else:
+            df2['label'] = df[cons_col].astype(str)
+    else:
+        # 如果没有 Conservation 列，尝试把最后一列作为标签（fallback）
+        last_col = cols[-1]
+        df2['label'] = pd.to_numeric(df[last_col], errors='coerce').where(
+            pd.to_numeric(df[last_col], errors='coerce').notna(),
+            df[last_col].astype(str)
+        )
+
+    # 返回规范列顺序
+    return df2[['chrom', 'start', 'end', 'gene_id', 'strand', 'label']]
 
 def normalize_label(col):
     """把 'TRUE'/'FALSE'/'1'/'0' 等字符串转成 1/0，如果是数值字符串(保守性)保持原样"""
@@ -97,11 +131,13 @@ def normalize_label(col):
             return x
         xs = str(x).strip()
         low = xs.lower()
-        if low in ('true','t','yes','1'):
+        if low in ('true','t','yes'):
             return 1
-        if low in ('false','f','no','0'):
+        if low in ('false','f','no'):
             return 0
-        # maybe numeric conservation value -> keep as float string
+        if low in ('1','0'):
+            return int(low)
+        # maybe numeric conservation value -> keep as float
         try:
             v = float(xs)
             return v
@@ -109,11 +145,11 @@ def normalize_label(col):
             return xs
     return col.apply(conv)
 
-# Replace generate_windows with this version:
+# Replace generate_windows with this corrected version:
 def generate_windows(df, window=512, stride=256, start_base=0, flank=0, chrom_sizes_path=None):
     """对每个 parent 划窗并在每个 window 两侧加 flank（可为 0）。
        如果提供 chrom_sizes_path（two-column chrom\\tlen），会 clamp 到边界。
-       返回 windows DataFrame with columns: chrom,start,end,window_id,parent_id,label
+       返回 windows DataFrame with columns: chrom,start,end,gene_id,strand,label
     """
     # load chrom sizes if provided
     chromlen = {}
@@ -133,7 +169,8 @@ def generate_windows(df, window=512, stride=256, start_base=0, flank=0, chrom_si
             st -= 1
         if st < 0:
             st = 0
-        parent_id = str(r['id'])
+        gene_id = str(r['gene_id'])
+        strand = str(r['strand']) if 'strand' in r.index else '.'
         label = r['label']
         region_len = en - st
 
@@ -145,10 +182,8 @@ def generate_windows(df, window=512, stride=256, start_base=0, flank=0, chrom_si
                 if we > L: we = L
                 # if after clamp length < window+2*flank, shift ws to keep window size if possible
                 if we - ws < window + 2*flank:
-                    # try to expand on left if possible
                     need = window + 2*flank - (we - ws)
                     ws = max(0, ws - need)
-                    # recompute we if still less than L
                     we = min(L, ws + window + 2*flank)
             else:
                 if ws < 0: ws = 0
@@ -158,38 +193,36 @@ def generate_windows(df, window=512, stride=256, start_base=0, flank=0, chrom_si
             n_windows = int((region_len - window) // stride) + 1
             if n_windows < 1:
                 n_windows = 1
+            # 正常滑窗
             for i in range(n_windows):
                 core_ws = st + i * stride
                 core_we = core_ws + window
                 ws = core_ws - flank
                 we = core_we + flank
-                # clamp
                 ws, we = clamp_bounds(ws, we)
-                win_id = f"{parent_id}:{i}"
-                rows.append((chrom, ws, we, win_id, parent_id, label))
-            # tail window
-            last_start = st + (n_windows - 1) * stride
-            last_end = last_start + window
-            if last_end < en:
+                # append consistent tuple: chrom, start, end, gene_id, strand, label
+                rows.append((chrom, ws, we, gene_id, strand, label))
+            # tail 窗口（如果最后一个 core window 没覆盖到 region 结尾）
+            last_core_start = st + (n_windows - 1) * stride
+            last_core_end = last_core_start + window
+            if last_core_end < en:
                 core_ws = max(st, en - window)
                 core_we = core_ws + window
                 ws = core_ws - flank
                 we = core_we + flank
                 ws, we = clamp_bounds(ws, we)
-                win_id = f"{parent_id}:{n_windows}"
-                rows.append((chrom, ws, we, win_id, parent_id, label))
+                rows.append((chrom, ws, we, gene_id, strand, label))
         else:
-            # short region: center expand core then add flank
+            # region 比 window 短，中心对齐
             center = (st + en) // 2
             core_ws = center - window // 2
             core_we = core_ws + window
             ws = core_ws - flank
             we = core_we + flank
             ws, we = clamp_bounds(ws, we)
-            win_id = f"{parent_id}:0"
-            rows.append((chrom, ws, we, win_id, parent_id, label))
+            rows.append((chrom, ws, we, gene_id, strand, label))
 
-    win_df = pd.DataFrame(rows, columns=['chrom','start','end','window_id','parent_id','label'])
+    win_df = pd.DataFrame(rows, columns=['chrom', 'start', 'end', 'gene_id', 'strand', 'label'])
     win_df['start'] = win_df['start'].astype(int)
     win_df['end'] = win_df['end'].astype(int)
     return win_df
@@ -197,8 +230,8 @@ def generate_windows(df, window=512, stride=256, start_base=0, flank=0, chrom_si
 def save_windows(win_df):
     bed_path = Path(OUT_DIR) / OUT_WINDOWS_BED
     csv_path = Path(OUT_DIR) / OUT_WINDOWS_CSV
-    # bed: chrom start end window_id label (no header)
-    win_df[['chrom','start','end','window_id','label']].to_csv(bed_path, sep='\t', index=False, header=False)
+    # bed: chrom start end gene_id strand label (no header)
+    win_df[['chrom','start','end','gene_id','strand','label']].to_csv(bed_path, sep='\t', index=False, header=False)
     win_df.to_csv(csv_path, index=False)
     print(f"Saved windows: {len(win_df)} rows -> {bed_path}, {csv_path}")
 
@@ -206,11 +239,9 @@ def split_by_parent(win_df, train_frac=0.7, val_frac=0.15, seed=42):
     """按 parent 做 group split，尽量按 parent-level label 做 stratify（通过 parent 的 mean label）
        返回 train_df, val_df, test_df
     """
-    # 计算 parent-level label（如果 label 是 0/1，则 mean 四舍五入），否则按字符串分布（fallback）
-    parent_df = win_df.groupby('parent_id')['label'].agg(list).reset_index()
+    parent_df = win_df.groupby('gene_id')['label'].agg(list).reset_index()
     # convert possible strings to numeric where possible
     def parent_label_from_list(lst):
-        # lst may contain 'TRUE'/'FALSE' or numeric strings or mixed
         vals = []
         for v in lst:
             try:
@@ -223,37 +254,26 @@ def split_by_parent(win_df, train_frac=0.7, val_frac=0.15, seed=42):
                     elif sv in ('false','f','no','0'):
                         vals.append(0.0)
                     else:
-                        # try float
                         vals.append(float(sv))
-                # append succeeded
             except:
-                # cannot parse -> ignore
                 pass
         if len(vals) == 0:
             return 0
-        # if values are 0/1 then majority
         if all((x in (0.0,1.0) for x in vals)):
             return int(round(np.mean(vals)))
-        # else treat numeric conservation: threshold at median to produce group label
         med = float(np.median(vals))
         return int((np.mean(vals) >= med))
     parent_df['group_label'] = parent_df['label'].apply(parent_label_from_list)
-    parents = parent_df['parent_id'].tolist()
+    parents = parent_df['gene_id'].tolist()
     group_labels = parent_df['group_label'].tolist()
 
-    # split parents -> train / tmp
     train_p, tmp_p = train_test_split(parents, train_size=train_frac, random_state=seed, stratify=group_labels)
-    # compute relative val fraction inside tmp
-    tmp_frac = 1.0 - train_frac
-    val_rel = val_frac / (val_frac + (1 - train_frac - val_frac)) if False else val_frac / (val_frac + (1 - train_frac - val_frac))
-    # actually simpler: split tmp into val/test equally by desired proportions:
-    # desired val_frac and test_frac are relative to total; so val_frac_rel = val_frac / (1-train_frac)
     val_frac_rel = val_frac / (1.0 - train_frac)
     val_p, test_p = train_test_split(tmp_p, train_size=val_frac_rel, random_state=seed)
-    # build dfs
-    train_df = win_df[win_df['parent_id'].isin(train_p)].reset_index(drop=True)
-    val_df = win_df[win_df['parent_id'].isin(val_p)].reset_index(drop=True)
-    test_df = win_df[win_df['parent_id'].isin(test_p)].reset_index(drop=True)
+
+    train_df = win_df[win_df['gene_id'].isin(train_p)].reset_index(drop=True)
+    val_df = win_df[win_df['gene_id'].isin(val_p)].reset_index(drop=True)
+    test_df = win_df[win_df['gene_id'].isin(test_p)].reset_index(drop=True)
     return train_df, val_df, test_df
 
 def save_splits(train_df, val_df, test_df):
@@ -261,10 +281,10 @@ def save_splits(train_df, val_df, test_df):
     train_df.to_csv(Path(OUT_DIR)/TRAIN_META, index=False)
     val_df.to_csv(Path(OUT_DIR)/VAL_META, index=False)
     test_df.to_csv(Path(OUT_DIR)/TEST_META, index=False)
-    # save bed versions (chrom start end window_id label)
-    train_df[['chrom','start','end','window_id','label']].to_csv(Path(OUT_DIR)/TRAIN_BED, sep='\t', index=False, header=False)
-    val_df[['chrom','start','end','window_id','label']].to_csv(Path(OUT_DIR)/VAL_BED, sep='\t', index=False, header=False)
-    test_df[['chrom','start','end','window_id','label']].to_csv(Path(OUT_DIR)/TEST_BED, sep='\t', index=False, header=False)
+    # save bed versions (chrom start end gene_id strand label)
+    train_df[['chrom','start','end','gene_id','strand','label']].to_csv(Path(OUT_DIR)/TRAIN_BED, sep='\t', index=False, header=False)
+    val_df[['chrom','start','end','gene_id','strand','label']].to_csv(Path(OUT_DIR)/VAL_BED, sep='\t', index=False, header=False)
+    test_df[['chrom','start','end','gene_id','strand','label']].to_csv(Path(OUT_DIR)/TEST_BED, sep='\t', index=False, header=False)
     print("Saved splits:")
     print(f"  train: {len(train_df)}, val: {len(val_df)}, test: {len(test_df)}")
     print(f"Files in {OUT_DIR}: {TRAIN_META}, {VAL_META}, {TEST_META}")
@@ -276,13 +296,13 @@ def main():
     # normalize labels (TRUE/FALSE -> 1/0 or float)
     df['label'] = normalize_label(df['label'])
     # generate windows
-    print("Generating windows: window=", WINDOW, "stride=", STRIDE, "start_base=", START_BASE)
+    print("Generating windows: window=", WINDOW, "stride=", STRIDE, "start_base=", START_BASE, "flank=", FLANK)
     win_df = generate_windows(df, window=WINDOW, stride=STRIDE, start_base=START_BASE, flank=FLANK)
     # save windows
     save_windows(win_df)
-    # split by parent
+    # split by parent and save splits as CSV (no JSON)
+    # 如果需要立即保存 split，取消注释下面两行
     # train_df, val_df, test_df = split_by_parent(win_df, train_frac=0.7, val_frac=0.15, seed=RANDOM_SEED)
-    # # save splits
     # save_splits(train_df, val_df, test_df)
     print("Done.")
 
