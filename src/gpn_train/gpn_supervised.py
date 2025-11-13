@@ -3,8 +3,7 @@
 """
 GPN Supervised Fine-tuning using Hugging Face Transformers
 
-Ê¹ÓÃHugging FaceµÄAutoModelForSequenceClassification½Ó¿Ú
-½øĞĞGPNÄ£ĞÍµÄ¼à¶½Ñ§Ï°ÑµÁ·£¨lncRNA±£ÊØĞÔÔ¤²â£©
+Using AutoModelForSequenceClassification for lncRNA conservation prediction
 """
 
 import torch
@@ -42,13 +41,13 @@ from gpn.data import Tokenizer
 
 
 # ============================================================================
-# 1. GPNConfig - Hugging Face¼æÈİµÄÅäÖÃÀà
+# 1. GPNConfig - Hugging Face compatible configuration class
 # ============================================================================
 
 class GPNConfig(PretrainedConfig):
     """
-    GPNÄ£ĞÍµÄÅäÖÃÀà
-    ¼Ì³Ğ×ÔPretrainedConfig£¬Ê¹GPN¼æÈİHugging FaceÉúÌ¬ÏµÍ³
+    Configuration class for GPN model
+    Inherits from PretrainedConfig to make GPN compatible with HF ecosystem
     """
     model_type = "gpn"
     
@@ -63,11 +62,11 @@ class GPNConfig(PretrainedConfig):
     ):
         """
         Args:
-            pretrained_model_path: GPNÔ¤ÑµÁ·Ä£ĞÍÂ·¾¶
-            num_labels: ·ÖÀàÀà±ğÊı£¨2 for binary classification£©
+            pretrained_model_path: Path to pretrained GPN model
+            num_labels: Number of labels (2 for binary classification)
             hidden_size: GPN hidden size (default: 768)
-            classifier_dropout: ·ÖÀàÍ·µÄdropoutÂÊ
-            freeze_backbone: ÊÇ·ñ¶³½áGPN backbone
+            classifier_dropout: Dropout rate for classifier head
+            freeze_backbone: Whether to freeze GPN backbone
         """
         super().__init__(num_labels=num_labels, **kwargs)
         self.pretrained_model_path = pretrained_model_path
@@ -77,13 +76,13 @@ class GPNConfig(PretrainedConfig):
 
 
 # ============================================================================
-# 2. GPNForSequenceClassification - HF¼æÈİµÄ·ÖÀàÄ£ĞÍ
+# 2. GPNForSequenceClassification - HF compatible classification model
 # ============================================================================
 
 class GPNForSequenceClassification(PreTrainedModel):
     """
-    GPNĞòÁĞ·ÖÀàÄ£ĞÍ
-    ¼Ì³ĞPreTrainedModel£¬Ê¹Æä¼æÈİHugging Face Trainer API
+    GPN sequence classification model
+    Inherits from PreTrainedModel to be compatible with HF Trainer API
     """
     config_class = GPNConfig
     
@@ -92,25 +91,25 @@ class GPNForSequenceClassification(PreTrainedModel):
         self.num_labels = config.num_labels
         self.config = config
         
-        # 1. ¼ÓÔØÔ¤ÑµÁ·µÄGPN backbone
+        # 1. Load pretrained GPN backbone
         print(f"Loading GPN model from: {config.pretrained_model_path}")
         self.gpn = ConvNetForMaskedLM.from_pretrained(
             config.pretrained_model_path
         )
         
-        # »ñÈ¡hidden size
+        # Get hidden size
         self.hidden_size = self.gpn.model.config.hidden_size
         
-        # 2. ÊÇ·ñ¶³½ábackbone
+        # 2. Freeze backbone if specified
         if config.freeze_backbone:
-            print("? Freezing GPN backbone (Ö»ÑµÁ··ÖÀàÍ·)")
+            print("Freezing GPN backbone (training classifier head only)")
             for param in self.gpn.parameters():
                 param.requires_grad = False
         else:
-            print("? Full fine-tuning (ÑµÁ·Õû¸öÄ£ĞÍ)")
+            print("Full fine-tuning (training entire model)")
         
-        # 3. ¶¨Òå·ÖÀàÍ·
-        # ½á¹¹: hidden_size -> hidden_size//2 -> num_labels
+        # 3. Define classification head
+        # Structure: hidden_size -> hidden_size//2 -> num_labels
         self.classifier = nn.Sequential(
             nn.Dropout(config.classifier_dropout),
             nn.Linear(self.hidden_size, self.hidden_size // 2),
@@ -119,10 +118,10 @@ class GPNForSequenceClassification(PreTrainedModel):
             nn.Linear(self.hidden_size // 2, config.num_labels)
         )
         
-        # 4. HF±ØĞèµÄ³õÊ¼»¯
+        # 4. HF required initialization
         self.post_init()
         
-        # Í³¼Æ²ÎÊı
+        # Count parameters
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.parameters())
         print(f"Trainable parameters: {trainable_params:,} / {total_params:,} "
@@ -149,7 +148,7 @@ class GPNForSequenceClassification(PreTrainedModel):
             SequenceClassifierOutput with loss and logits
         """
         
-        # 1. »ñÈ¡GPN embeddings
+        # 1. Get GPN embeddings
         outputs = self.gpn.model(
             input_ids,
             attention_mask=attention_mask
@@ -157,16 +156,16 @@ class GPNForSequenceClassification(PreTrainedModel):
         hidden_states = outputs.last_hidden_state  # [batch, seq_len, hidden_size]
         
         # 2. Mean Pooling
-        # ¶ÔËùÓĞtokenµÄembeddingsÈ¡Æ½¾ù£¨¿¼ÂÇattention_mask£©
+        # Average all token embeddings (considering attention_mask)
         mask_expanded = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
         sum_embeddings = torch.sum(hidden_states * mask_expanded, dim=1)
         sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
         pooled_output = sum_embeddings / sum_mask  # [batch, hidden_size]
         
-        # 3. ·ÖÀà
+        # 3. Classification
         logits = self.classifier(pooled_output)  # [batch, num_labels]
         
-        # 4. ¼ÆËãloss
+        # 4. Calculate loss
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -175,7 +174,7 @@ class GPNForSequenceClassification(PreTrainedModel):
                 labels.view(-1)
             )
         
-        # 5. ·µ»ØHF±ê×¼Êä³ö
+        # 5. Return HF standard output
         if not return_dict:
             output = (logits,) + outputs[1:]
             return ((loss,) + output) if loss is not None else output
@@ -189,37 +188,37 @@ class GPNForSequenceClassification(PreTrainedModel):
 
 
 # ============================================================================
-# 3. Dataset - Êı¾İ¼ÓÔØÀà
+# 3. Dataset - Data loading class
 # ============================================================================
 
 class FineTuningDataset(Dataset):
     """
-    Fine-tuningÊı¾İ¼¯
-    ´ÓJSONÎÄ¼ş¼ÓÔØÔ¤´¦ÀíºÃµÄÊı¾İ
+    Fine-tuning dataset
+    Loads preprocessed data from JSON file
     """
     
     def __init__(self, data_file, tokenizer, max_length=512):
         """
         Args:
-            data_file: JSONÊı¾İÎÄ¼şÂ·¾¶
+            data_file: Path to JSON data file
             tokenizer: GPN tokenizer
-            max_length: ×î´óĞòÁĞ³¤¶È
+            max_length: Maximum sequence length
         """
         self.tokenizer = tokenizer
         self.max_length = max_length
         
-        # ¼ÓÔØÊı¾İ
+        # Load data
         print(f"Loading data from: {data_file}")
         with open(data_file, 'r') as f:
             self.data = json.load(f)
         
         print(f"Loaded {len(self.data)} samples")
         
-        # Í³¼Æ±êÇ©·Ö²¼
+        # Print label distribution
         self._print_label_distribution()
     
     def _print_label_distribution(self):
-        """´òÓ¡±êÇ©·Ö²¼"""
+        """Print label distribution"""
         labels = [item['label'] for item in self.data]
         unique, counts = np.unique(labels, return_counts=True)
         
@@ -233,18 +232,18 @@ class FineTuningDataset(Dataset):
     
     def __getitem__(self, idx):
         """
-        ·µ»ØÒ»¸öÑù±¾
+        Get one sample
         
         Returns:
             dict with keys: input_ids, attention_mask, labels
         """
         item = self.data[idx]
         
-        # »ñÈ¡ĞòÁĞºÍ±êÇ©
+        # Get sequence and label
         sequence = item['sequence']
         label = item['label']
         
-        # TokenizeĞòÁĞ
+        # Tokenize sequence
         seq_array = np.array(list(sequence))
         tokens = self.tokenizer(seq_array)
         
@@ -272,13 +271,13 @@ class FineTuningDataset(Dataset):
 
 
 # ============================================================================
-# 4. Metrics¼ÆËãº¯Êı
+# 4. Metrics computation function
 # ============================================================================
 
 def compute_metrics(eval_pred):
     """
-    ¼ÆËãÆÀ¹ÀÖ¸±ê
-    Trainer»á×Ô¶¯µ÷ÓÃÕâ¸öº¯Êı
+    Compute evaluation metrics
+    Trainer will automatically call this function
     
     Args:
         eval_pred: EvalPrediction with predictions and label_ids
@@ -289,15 +288,15 @@ def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = np.argmax(predictions, axis=1)
     
-    # ¼ÆËã¸÷ÖÖÖ¸±ê
+    # Calculate various metrics
     accuracy = accuracy_score(labels, predictions)
     f1 = f1_score(labels, predictions, average='weighted')
     precision = precision_score(labels, predictions, average='weighted', zero_division=0)
     recall = recall_score(labels, predictions, average='weighted', zero_division=0)
     
-    # ³¢ÊÔ¼ÆËãAUC£¨ĞèÒª¸ÅÂÊÖµ£©
+    # Try to calculate AUC (requires probability values)
     try:
-        # Ê¹ÓÃÔ¤²â¸ÅÂÊ¼ÆËãAUC
+        # Calculate AUC using predicted probabilities
         probs = np.exp(eval_pred.predictions) / np.exp(eval_pred.predictions).sum(axis=1, keepdims=True)
         auc = roc_auc_score(labels, probs[:, 1])
     except:
@@ -313,7 +312,7 @@ def compute_metrics(eval_pred):
 
 
 # ============================================================================
-# 5. Ö÷ÑµÁ·º¯Êı
+# 5. Main training function
 # ============================================================================
 
 def main():
@@ -321,18 +320,18 @@ def main():
         description="GPN Supervised Fine-tuning with Hugging Face Transformers"
     )
     
-    # Êı¾İ²ÎÊı
+    # Data parameters
     parser.add_argument('--data', required=True, help="Path to processed JSON data file")
     parser.add_argument('--pretrained-model', required=True, help="Path to pretrained GPN model")
     parser.add_argument('--output', default='output/gpn_supervised', help="Output directory")
     
-    # Ä£ĞÍ²ÎÊı
+    # Model parameters
     parser.add_argument('--num-labels', type=int, default=2, help="Number of classes")
     parser.add_argument('--max-length', type=int, default=512, help="Max sequence length")
     parser.add_argument('--freeze-backbone', action='store_true', help="Freeze GPN backbone")
     parser.add_argument('--classifier-dropout', type=float, default=0.1, help="Classifier dropout")
     
-    # ÑµÁ·²ÎÊı
+    # è®­ç»ƒå‚æ•°
     parser.add_argument('--epochs', type=int, default=20, help="Number of epochs")
     parser.add_argument('--batch-size', type=int, default=16, help="Batch size")
     parser.add_argument('--eval-batch-size', type=int, default=32, help="Evaluation batch size")
@@ -340,17 +339,17 @@ def main():
     parser.add_argument('--weight-decay', type=float, default=0.01, help="Weight decay")
     parser.add_argument('--warmup-ratio', type=float, default=0.1, help="Warmup ratio")
     
-    # ÆÀ¹ÀºÍ±£´æ
+    # è¯„ä¼°å’Œä¿å­˜
     parser.add_argument('--eval-steps', type=int, default=100, help="Evaluation steps")
     parser.add_argument('--save-steps', type=int, default=100, help="Save checkpoint steps")
     parser.add_argument('--save-total-limit', type=int, default=3, help="Max checkpoints to keep")
     parser.add_argument('--early-stopping-patience', type=int, default=3, help="Early stopping patience")
     
-    # ¸ß¼¶ÌØĞÔ
+    # é«˜çº§ç‰¹æ€§
     parser.add_argument('--fp16', action='store_true', help="Enable mixed precision training")
     parser.add_argument('--gradient-accumulation-steps', type=int, default=1, help="Gradient accumulation")
     
-    # ÆäËû
+    # å…¶ä»–
     parser.add_argument('--seed', type=int, default=42, help="Random seed")
     parser.add_argument('--test-size', type=float, default=0.15, help="Test set size")
     parser.add_argument('--val-size', type=float, default=0.15, help="Validation set size")
@@ -365,7 +364,7 @@ def main():
         print(f"  {arg}: {value}")
     print()
     
-    # 1. ´´½¨Ä£ĞÍÅäÖÃ
+    # 1. Create model configuration
     config = GPNConfig(
         pretrained_model_path=args.pretrained_model,
         num_labels=args.num_labels,
@@ -374,27 +373,27 @@ def main():
         freeze_backbone=args.freeze_backbone
     )
     
-    # 2. ´´½¨Ä£ĞÍ
+    # 2. Create model
     print("\n" + "=" * 80)
     print("Creating Model")
     print("=" * 80 + "\n")
     model = GPNForSequenceClassification(config)
     
-    # 3. ×¼±¸Êı¾İ
+    # 3. Prepare data
     print("\n" + "=" * 80)
     print("Loading Data")
     print("=" * 80 + "\n")
     
     tokenizer = Tokenizer()
     
-    # ¼ÓÔØÍêÕûÊı¾İ¼¯
+    # Load full dataset
     full_dataset = FineTuningDataset(
         data_file=args.data,
         tokenizer=tokenizer,
         max_length=args.max_length
     )
     
-    # ·Ö¸îÊı¾İ¼¯: train/val/test
+    # Split dataset: train/val/test
     total_size = len(full_dataset)
     test_size = int(total_size * args.test_size)
     val_size = int(total_size * args.val_size)
@@ -411,17 +410,18 @@ def main():
         generator=torch.Generator().manual_seed(args.seed)
     )
     
-    # 4. ÑµÁ·²ÎÊı
+    # 4. Training arguments
     print("\n" + "=" * 80)
     print("Training Setup")
     print("=" * 80 + "\n")
     
+    # Simplified TrainingArguments for better compatibility
     training_args = TrainingArguments(
-        # Êä³öÄ¿Â¼
+        # Output directory
         output_dir=args.output,
         overwrite_output_dir=True,
         
-        # ÑµÁ·²ÎÊı
+        # Training parameters
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.eval_batch_size,
@@ -429,34 +429,33 @@ def main():
         weight_decay=args.weight_decay,
         warmup_ratio=args.warmup_ratio,
         
-        # ÆÀ¹ÀºÍ±£´æ
+        # Evaluation and saving
         evaluation_strategy="steps",
         eval_steps=args.eval_steps,
         save_strategy="steps",
         save_steps=args.save_steps,
         save_total_limit=args.save_total_limit,
         
-        # ×î¼ÑÄ£ĞÍ
+        # Best model
         load_best_model_at_end=True,
         metric_for_best_model="f1",
         greater_is_better=True,
         
-        # ÈÕÖ¾
+        # Logging
         logging_dir=f"{args.output}/logs",
         logging_steps=50,
-        report_to="tensorboard",
         
-        # ¸ß¼¶ÌØĞÔ
+        # Advanced features
         fp16=args.fp16,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         
-        # ÆäËû
+        # Others
         seed=args.seed,
-        dataloader_num_workers=2,
-        remove_unused_columns=False,
+        # Removed: dataloader_num_workers, remove_unused_columns, report_to
+        # to avoid compatibility issues
     )
     
-    # 5. ´´½¨Trainer
+    # 5. Create Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -468,16 +467,16 @@ def main():
         ]
     )
     
-    # 6. ¿ªÊ¼ÑµÁ·
+    # 6. Start training
     print("\n" + "=" * 80)
-    print("? Starting Training")
+    print("ğŸš€ Starting Training")
     print("=" * 80 + "\n")
     
     trainer.train()
     
-    # 7. ÔÚ²âÊÔ¼¯ÉÏÆÀ¹À
+    # 7. Evaluate on test set
     print("\n" + "=" * 80)
-    print("? Evaluating on Test Set")
+    print("ğŸ“Š Evaluating on Test Set")
     print("=" * 80 + "\n")
     
     test_results = trainer.evaluate(test_dataset)
@@ -486,22 +485,22 @@ def main():
     for key, value in test_results.items():
         print(f"  {key}: {value:.4f}")
     
-    # ±£´æ²âÊÔ½á¹û
+    # Save test results
     test_results_file = Path(args.output) / 'test_results.json'
     with open(test_results_file, 'w') as f:
         json.dump(test_results, f, indent=2)
     print(f"\nTest results saved to: {test_results_file}")
     
-    # 8. Éú³ÉÏêÏ¸µÄ·ÖÀà±¨¸æ
+    # 8. Generate detailed classification report
     print("\n" + "=" * 80)
-    print("? Generating Classification Report")
+    print("ğŸ“ Generating Classification Report")
     print("=" * 80 + "\n")
     
     predictions_output = trainer.predict(test_dataset)
     predictions = np.argmax(predictions_output.predictions, axis=1)
     labels = predictions_output.label_ids
     
-    # ·ÖÀà±¨¸æ
+    # Classification report
     report = classification_report(
         labels,
         predictions,
@@ -510,12 +509,12 @@ def main():
     )
     print(report)
     
-    # »ìÏı¾ØÕó
+    # Confusion matrix
     cm = confusion_matrix(labels, predictions)
     print("Confusion Matrix:")
     print(cm)
     
-    # ±£´æ·ÖÀà±¨¸æ
+    # Save classification report
     report_file = Path(args.output) / 'classification_report.txt'
     with open(report_file, 'w') as f:
         f.write("Classification Report\n")
@@ -525,9 +524,9 @@ def main():
         f.write(str(cm))
     print(f"\nClassification report saved to: {report_file}")
     
-    # 9. ±£´æ×îÖÕÄ£ĞÍ
+    # 9. Save final model
     print("\n" + "=" * 80)
-    print("? Saving Final Model")
+    print("ğŸ’¾ Saving Final Model")
     print("=" * 80 + "\n")
     
     final_model_path = Path(args.output) / 'final_model'
@@ -535,7 +534,7 @@ def main():
     print(f"Model saved to: {final_model_path}")
     
     print("\n" + "=" * 80)
-    print("? Training Completed Successfully!")
+    print("âœ… Training Completed Successfully!")
     print("=" * 80 + "\n")
     
     return 0
