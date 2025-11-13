@@ -416,6 +416,7 @@ def main():
     print("=" * 80 + "\n")
     
     # Simplified TrainingArguments for better compatibility
+    # Avoid dispatch_batches error by using minimal configuration
     training_args = TrainingArguments(
         # Output directory
         output_dir=args.output,
@@ -445,14 +446,15 @@ def main():
         logging_dir=f"{args.output}/logs",
         logging_steps=50,
         
-        # Advanced features
+        # Advanced features  
         fp16=args.fp16,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         
         # Others
         seed=args.seed,
-        # Removed: dataloader_num_workers, remove_unused_columns, report_to
-        # to avoid compatibility issues
+        no_cuda=False,
+        ddp_find_unused_parameters=False,
+        dataloader_pin_memory=True,
     )
     
     # 5. Create Trainer
