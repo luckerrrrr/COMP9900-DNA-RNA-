@@ -415,6 +415,7 @@ def main():
     print("Training Setup")
     print("=" * 80 + "\n")
     
+    # Simplified TrainingArguments for better compatibility
     training_args = TrainingArguments(
         # Output directory
         output_dir=args.output,
@@ -443,7 +444,6 @@ def main():
         # Logging
         logging_dir=f"{args.output}/logs",
         logging_steps=50,
-        report_to="tensorboard",
         
         # Advanced features
         fp16=args.fp16,
@@ -451,8 +451,8 @@ def main():
         
         # Others
         seed=args.seed,
-        dataloader_num_workers=2,
-        remove_unused_columns=False,
+        # Removed: dataloader_num_workers, remove_unused_columns, report_to
+        # to avoid compatibility issues
     )
     
     # 5. Create Trainer
