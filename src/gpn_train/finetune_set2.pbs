@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -N gpn_finetune_set2
+#PBS -l select=1:ncpus=4:mem=32GB:ngpus=1
+#PBS -l walltime=12:00:00
+#PBS -j oe
+#PBS -o finetune_set2.log
+#PBS -M z5618581@unsw.edu.au
+#PBS -m ae
+
+# Load modules
+module load cuda
+module load singularity 2>/dev/null || true
+
+# Set environment variables
+export HF_HOME=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+export TRANSFORMERS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
+
+# Change to project directory
+cd /home/z5618581/capstone-project-25t3-9900-f09c-donut || exit 1
+
+# Container path
+CONTAINER="/srv/scratch/$USER/images/p3.sif"
+
+# Model and data paths
+PRETRAINED_MODEL="output/mouse_gpn_finetuned"
+DATA_FILE="data/FineTuningSet2_processed.json"
+OUTPUT_DIR="output/finetuning_set2"
+
+# Training parameters
+EPOCHS=20
+BATCH_SIZE=16
+LEARNING_RATE=2e-5
+MAX_LENGTH=512
+
+echo "========================================="
+echo "GPN Supervised Fine-tuning - Set2"
+echo "========================================="
+echo "Data: $DATA_FILE"
+echo "Pretrained Model: $PRETRAINED_MODEL"
+echo "Output: $OUTPUT_DIR"
+echo "Epochs: $EPOCHS"
+echo "Batch Size: $BATCH_SIZE"
+echo "Learning Rate: $LEARNING_RATE"
+echo "========================================="
+
+# Run training
+apptainer exec --nv "$CONTAINER" python3 src/gpn_train/gpn_supervised.py \
+    --data "$DATA_FILE" \
+    --pretrained-model "$PRETRAINED_MODEL" \
+    --output "$OUTPUT_DIR" \
+    --num-labels 2 \
+    --max-length "$MAX_LENGTH" \
+    --epochs "$EPOCHS" \
+    --batch-size "$BATCH_SIZE" \
+    --eval-batch-size 32 \
+    --lr "$LEARNING_RATE" \
+    --weight-decay 0.01 \
+    --warmup-ratio 0.1 \
+    --eval-steps 100 \
+    --save-steps 100 \
+    --save-total-limit 3 \
+    --early-stopping-patience 3 \
+    --fp16 \
+    --seed 42 \
+    --test-size 0.15 \
+    --val-size 0.15
+
+echo "========================================="
+echo "Training completed!"
+echo "Results saved to: $OUTPUT_DIR"
+echo "========================================="
+
