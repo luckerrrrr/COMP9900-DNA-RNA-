@@ -3,8 +3,7 @@
 """
 GPN Supervised Fine-tuning using Hugging Face Transformers
 
-使用Hugging Face的AutoModelForSequenceClassification接口
-进行GPN模型的监督学习训练（lncRNA保守性预测）
+Using AutoModelForSequenceClassification for lncRNA conservation prediction
 """
 
 import torch
@@ -42,13 +41,13 @@ from gpn.data import Tokenizer
 
 
 # ============================================================================
-# 1. GPNConfig - Hugging Face兼容的配置类
+# 1. GPNConfig - Hugging Face compatible configuration class
 # ============================================================================
 
 class GPNConfig(PretrainedConfig):
     """
-    GPN模型的配置类
-    继承自PretrainedConfig，使GPN兼容Hugging Face生态系统
+    Configuration class for GPN model
+    Inherits from PretrainedConfig to make GPN compatible with HF ecosystem
     """
     model_type = "gpn"
     
@@ -63,11 +62,11 @@ class GPNConfig(PretrainedConfig):
     ):
         """
         Args:
-            pretrained_model_path: GPN预训练模型路径
-            num_labels: 分类类别数（2 for binary classification）
+            pretrained_model_path: Path to pretrained GPN model
+            num_labels: Number of labels (2 for binary classification)
             hidden_size: GPN hidden size (default: 768)
-            classifier_dropout: 分类头的dropout率
-            freeze_backbone: 是否冻结GPN backbone
+            classifier_dropout: Dropout rate for classifier head
+            freeze_backbone: Whether to freeze GPN backbone
         """
         super().__init__(num_labels=num_labels, **kwargs)
         self.pretrained_model_path = pretrained_model_path
@@ -77,13 +76,13 @@ class GPNConfig(PretrainedConfig):
 
 
 # ============================================================================
-# 2. GPNForSequenceClassification - HF兼容的分类模型
+# 2. GPNForSequenceClassification - HF compatible classification model
 # ============================================================================
 
 class GPNForSequenceClassification(PreTrainedModel):
     """
-    GPN序列分类模型
-    继承PreTrainedModel，使其兼容Hugging Face Trainer API
+    GPN sequence classification model
+    Inherits from PreTrainedModel to be compatible with HF Trainer API
     """
     config_class = GPNConfig
     
@@ -92,25 +91,25 @@ class GPNForSequenceClassification(PreTrainedModel):
         self.num_labels = config.num_labels
         self.config = config
         
-        # 1. 加载预训练的GPN backbone
+        # 1. Load pretrained GPN backbone
         print(f"Loading GPN model from: {config.pretrained_model_path}")
         self.gpn = ConvNetForMaskedLM.from_pretrained(
             config.pretrained_model_path
         )
         
-        # 获取hidden size
+        # Get hidden size
         self.hidden_size = self.gpn.model.config.hidden_size
         
-        # 2. 是否冻结backbone
+        # 2. Freeze backbone if specified
         if config.freeze_backbone:
-            print("? Freezing GPN backbone (只训练分类头)")
+            print("Freezing GPN backbone (training classifier head only)")
             for param in self.gpn.parameters():
                 param.requires_grad = False
         else:
-            print("? Full fine-tuning (训练整个模型)")
+            print("Full fine-tuning (training entire model)")
         
-        # 3. 定义分类头
-        # 结构: hidden_size -> hidden_size//2 -> num_labels
+        # 3. Define classification head
+        # Structure: hidden_size -> hidden_size//2 -> num_labels
         self.classifier = nn.Sequential(
             nn.Dropout(config.classifier_dropout),
             nn.Linear(self.hidden_size, self.hidden_size // 2),
@@ -119,10 +118,10 @@ class GPNForSequenceClassification(PreTrainedModel):
             nn.Linear(self.hidden_size // 2, config.num_labels)
         )
         
-        # 4. HF必需的初始化
+        # 4. HF required initialization
         self.post_init()
         
-        # 统计参数
+        # Count parameters
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.parameters())
         print(f"Trainable parameters: {trainable_params:,} / {total_params:,} "
@@ -149,7 +148,7 @@ class GPNForSequenceClassification(PreTrainedModel):
             SequenceClassifierOutput with loss and logits
         """
         
-        # 1. 获取GPN embeddings
+        # 1. Get GPN embeddings
         outputs = self.gpn.model(
             input_ids,
             attention_mask=attention_mask
@@ -157,16 +156,16 @@ class GPNForSequenceClassification(PreTrainedModel):
         hidden_states = outputs.last_hidden_state  # [batch, seq_len, hidden_size]
         
         # 2. Mean Pooling
-        # 对所有token的embeddings取平均（考虑attention_mask）
+        # Average all token embeddings (considering attention_mask)
         mask_expanded = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
         sum_embeddings = torch.sum(hidden_states * mask_expanded, dim=1)
         sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
         pooled_output = sum_embeddings / sum_mask  # [batch, hidden_size]
         
-        # 3. 分类
+        # 3. Classification
         logits = self.classifier(pooled_output)  # [batch, num_labels]
         
-        # 4. 计算loss
+        # 4. Calculate loss
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -175,7 +174,7 @@ class GPNForSequenceClassification(PreTrainedModel):
                 labels.view(-1)
             )
         
-        # 5. 返回HF标准输出
+        # 5. Return HF standard output
         if not return_dict:
             output = (logits,) + outputs[1:]
             return ((loss,) + output) if loss is not None else output
@@ -189,37 +188,37 @@ class GPNForSequenceClassification(PreTrainedModel):
 
 
 # ============================================================================
-# 3. Dataset - 数据加载类
+# 3. Dataset - Data loading class
 # ============================================================================
 
 class FineTuningDataset(Dataset):
     """
-    Fine-tuning数据集
-    从JSON文件加载预处理好的数据
+    Fine-tuning dataset
+    Loads preprocessed data from JSON file
     """
     
     def __init__(self, data_file, tokenizer, max_length=512):
         """
         Args:
-            data_file: JSON数据文件路径
+            data_file: Path to JSON data file
             tokenizer: GPN tokenizer
-            max_length: 最大序列长度
+            max_length: Maximum sequence length
         """
         self.tokenizer = tokenizer
         self.max_length = max_length
         
-        # 加载数据
+        # Load data
         print(f"Loading data from: {data_file}")
         with open(data_file, 'r') as f:
             self.data = json.load(f)
         
         print(f"Loaded {len(self.data)} samples")
         
-        # 统计标签分布
+        # Print label distribution
         self._print_label_distribution()
     
     def _print_label_distribution(self):
-        """打印标签分布"""
+        """Print label distribution"""
         labels = [item['label'] for item in self.data]
         unique, counts = np.unique(labels, return_counts=True)
         
@@ -233,18 +232,18 @@ class FineTuningDataset(Dataset):
     
     def __getitem__(self, idx):
         """
-        返回一个样本
+        Get one sample
         
         Returns:
             dict with keys: input_ids, attention_mask, labels
         """
         item = self.data[idx]
         
-        # 获取序列和标签
+        # Get sequence and label
         sequence = item['sequence']
         label = item['label']
         
-        # Tokenize序列
+        # Tokenize sequence
         seq_array = np.array(list(sequence))
         tokens = self.tokenizer(seq_array)
         
@@ -272,13 +271,13 @@ class FineTuningDataset(Dataset):
 
 
 # ============================================================================
-# 4. Metrics计算函数
+# 4. Metrics computation function
 # ============================================================================
 
 def compute_metrics(eval_pred):
     """
-    计算评估指标
-    Trainer会自动调用这个函数
+    Compute evaluation metrics
+    Trainer will automatically call this function
     
     Args:
         eval_pred: EvalPrediction with predictions and label_ids
@@ -289,15 +288,15 @@ def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = np.argmax(predictions, axis=1)
     
-    # 计算各种指标
+    # Calculate various metrics
     accuracy = accuracy_score(labels, predictions)
     f1 = f1_score(labels, predictions, average='weighted')
     precision = precision_score(labels, predictions, average='weighted', zero_division=0)
     recall = recall_score(labels, predictions, average='weighted', zero_division=0)
     
-    # 尝试计算AUC（需要概率值）
+    # Try to calculate AUC (requires probability values)
     try:
-        # 使用预测概率计算AUC
+        # Calculate AUC using predicted probabilities
         probs = np.exp(eval_pred.predictions) / np.exp(eval_pred.predictions).sum(axis=1, keepdims=True)
         auc = roc_auc_score(labels, probs[:, 1])
     except:
@@ -313,7 +312,7 @@ def compute_metrics(eval_pred):
 
 
 # ============================================================================
-# 5. 主训练函数
+# 5. Main training function
 # ============================================================================
 
 def main():
@@ -321,12 +320,12 @@ def main():
         description="GPN Supervised Fine-tuning with Hugging Face Transformers"
     )
     
-    # 数据参数
+    # Data parameters
     parser.add_argument('--data', required=True, help="Path to processed JSON data file")
     parser.add_argument('--pretrained-model', required=True, help="Path to pretrained GPN model")
     parser.add_argument('--output', default='output/gpn_supervised', help="Output directory")
     
-    # 模型参数
+    # Model parameters
     parser.add_argument('--num-labels', type=int, default=2, help="Number of classes")
     parser.add_argument('--max-length', type=int, default=512, help="Max sequence length")
     parser.add_argument('--freeze-backbone', action='store_true', help="Freeze GPN backbone")
@@ -365,7 +364,7 @@ def main():
         print(f"  {arg}: {value}")
     print()
     
-    # 1. 创建模型配置
+    # 1. Create model configuration
     config = GPNConfig(
         pretrained_model_path=args.pretrained_model,
         num_labels=args.num_labels,
@@ -374,27 +373,27 @@ def main():
         freeze_backbone=args.freeze_backbone
     )
     
-    # 2. 创建模型
+    # 2. Create model
     print("\n" + "=" * 80)
     print("Creating Model")
     print("=" * 80 + "\n")
     model = GPNForSequenceClassification(config)
     
-    # 3. 准备数据
+    # 3. Prepare data
     print("\n" + "=" * 80)
     print("Loading Data")
     print("=" * 80 + "\n")
     
     tokenizer = Tokenizer()
     
-    # 加载完整数据集
+    # Load full dataset
     full_dataset = FineTuningDataset(
         data_file=args.data,
         tokenizer=tokenizer,
         max_length=args.max_length
     )
     
-    # 分割数据集: train/val/test
+    # Split dataset: train/val/test
     total_size = len(full_dataset)
     test_size = int(total_size * args.test_size)
     val_size = int(total_size * args.val_size)
@@ -411,17 +410,17 @@ def main():
         generator=torch.Generator().manual_seed(args.seed)
     )
     
-    # 4. 训练参数
+    # 4. Training arguments
     print("\n" + "=" * 80)
     print("Training Setup")
     print("=" * 80 + "\n")
     
     training_args = TrainingArguments(
-        # 输出目录
+        # Output directory
         output_dir=args.output,
         overwrite_output_dir=True,
         
-        # 训练参数
+        # Training parameters
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.eval_batch_size,
@@ -429,34 +428,34 @@ def main():
         weight_decay=args.weight_decay,
         warmup_ratio=args.warmup_ratio,
         
-        # 评估和保存
+        # Evaluation and saving
         evaluation_strategy="steps",
         eval_steps=args.eval_steps,
         save_strategy="steps",
         save_steps=args.save_steps,
         save_total_limit=args.save_total_limit,
         
-        # 最佳模型
+        # Best model
         load_best_model_at_end=True,
         metric_for_best_model="f1",
         greater_is_better=True,
         
-        # 日志
+        # Logging
         logging_dir=f"{args.output}/logs",
         logging_steps=50,
         report_to="tensorboard",
         
-        # 高级特性
+        # Advanced features
         fp16=args.fp16,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         
-        # 其他
+        # Others
         seed=args.seed,
         dataloader_num_workers=2,
         remove_unused_columns=False,
     )
     
-    # 5. 创建Trainer
+    # 5. Create Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -468,14 +467,14 @@ def main():
         ]
     )
     
-    # 6. 开始训练
+    # 6. Start training
     print("\n" + "=" * 80)
     print("? Starting Training")
     print("=" * 80 + "\n")
     
     trainer.train()
     
-    # 7. 在测试集上评估
+    # 7. Evaluate on test set
     print("\n" + "=" * 80)
     print("? Evaluating on Test Set")
     print("=" * 80 + "\n")
@@ -486,13 +485,13 @@ def main():
     for key, value in test_results.items():
         print(f"  {key}: {value:.4f}")
     
-    # 保存测试结果
+    # Save test results
     test_results_file = Path(args.output) / 'test_results.json'
     with open(test_results_file, 'w') as f:
         json.dump(test_results, f, indent=2)
     print(f"\nTest results saved to: {test_results_file}")
     
-    # 8. 生成详细的分类报告
+    # 8. Generate detailed classification report
     print("\n" + "=" * 80)
     print("? Generating Classification Report")
     print("=" * 80 + "\n")
@@ -501,7 +500,7 @@ def main():
     predictions = np.argmax(predictions_output.predictions, axis=1)
     labels = predictions_output.label_ids
     
-    # 分类报告
+    # Classification report
     report = classification_report(
         labels,
         predictions,
@@ -510,12 +509,12 @@ def main():
     )
     print(report)
     
-    # 混淆矩阵
+    # Confusion matrix
     cm = confusion_matrix(labels, predictions)
     print("Confusion Matrix:")
     print(cm)
     
-    # 保存分类报告
+    # Save classification report
     report_file = Path(args.output) / 'classification_report.txt'
     with open(report_file, 'w') as f:
         f.write("Classification Report\n")
@@ -525,7 +524,7 @@ def main():
         f.write(str(cm))
     print(f"\nClassification report saved to: {report_file}")
     
-    # 9. 保存最终模型
+    # 9. Save final model
     print("\n" + "=" * 80)
     print("? Saving Final Model")
     print("=" * 80 + "\n")
