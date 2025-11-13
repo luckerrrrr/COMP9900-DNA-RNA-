@@ -11,12 +11,11 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from transformers import (
     PretrainedConfig,
-    PreTrainedModel,
-    Trainer,
-    TrainingArguments,
-    EarlyStoppingCallback
+    PreTrainedModel
 )
 from transformers.modeling_outputs import SequenceClassifierOutput
+import torch.optim as optim
+from torch.utils.data import DataLoader
 import numpy as np
 import json
 import argparse
@@ -31,6 +30,8 @@ from sklearn.metrics import (
     classification_report
 )
 import sys
+import warnings
+warnings.filterwarnings('ignore')
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -410,129 +411,202 @@ def main():
         generator=torch.Generator().manual_seed(args.seed)
     )
     
-    # 4. Training arguments
+    # 4. Create data loaders  
+    print("\n" + "=" * 80)
+    print("Creating Data Loaders")
+    print("=" * 80 + "\n")
+    
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=args.eval_batch_size, shuffle=False, num_workers=2)
+    test_loader = DataLoader(test_dataset, batch_size=args.eval_batch_size, shuffle=False, num_workers=2)
+    
+    print(f"Train batches: {len(train_loader)}")
+    print(f"Val batches: {len(val_loader)}")
+    print(f"Test batches: {len(test_loader)}")
+    
+    # 5. Setup training
     print("\n" + "=" * 80)
     print("Training Setup")
     print("=" * 80 + "\n")
     
-    # Simplified TrainingArguments for better compatibility
-    # Avoid dispatch_batches error by using minimal configuration
-    training_args = TrainingArguments(
-        # Output directory
-        output_dir=args.output,
-        overwrite_output_dir=True,
-        
-        # Training parameters
-        num_train_epochs=args.epochs,
-        per_device_train_batch_size=args.batch_size,
-        per_device_eval_batch_size=args.eval_batch_size,
-        learning_rate=args.lr,
-        weight_decay=args.weight_decay,
-        warmup_ratio=args.warmup_ratio,
-        
-        # Evaluation and saving
-        evaluation_strategy="steps",
-        eval_steps=args.eval_steps,
-        save_strategy="steps",
-        save_steps=args.save_steps,
-        save_total_limit=args.save_total_limit,
-        
-        # Best model
-        load_best_model_at_end=True,
-        metric_for_best_model="f1",
-        greater_is_better=True,
-        
-        # Logging
-        logging_dir=f"{args.output}/logs",
-        logging_steps=50,
-        
-        # Advanced features  
-        fp16=args.fp16,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        
-        # Others
-        seed=args.seed,
-        no_cuda=False,
-        ddp_find_unused_parameters=False,
-        dataloader_pin_memory=True,
-    )
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
     
-    # 5. Create Trainer
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=val_dataset,
-        compute_metrics=compute_metrics,
-        callbacks=[
-            EarlyStoppingCallback(early_stopping_patience=args.early_stopping_patience)
-        ]
-    )
+    model = model.to(device)
     
-    # 6. Start training
+    # Optimizer
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    
+    # Learning rate scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2, verbose=True)
+    
+    # Output directory
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 6. Training loop
     print("\n" + "=" * 80)
-    print("? Starting Training")
+    print("Starting Training")
     print("=" * 80 + "\n")
     
-    trainer.train()
+    best_val_f1 = 0.0
+    patience_counter = 0
+    history = {'train_loss': [], 'val_loss': [], 'val_f1': [], 'val_acc': []}
     
-    # 7. Evaluate on test set
+    for epoch in range(args.epochs):
+        print(f"\nEpoch {epoch + 1}/{args.epochs}")
+        print("-" * 80)
+        
+        # Train
+        model.train()
+        train_loss = 0.0
+        for batch_idx, batch in enumerate(train_loader):
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss
+            loss.backward()
+            optimizer.step()
+            
+            train_loss += loss.item()
+            
+            if (batch_idx + 1) % 50 == 0:
+                print(f"  Step {batch_idx + 1}/{len(train_loader)}: loss={loss.item():.4f}")
+        
+        avg_train_loss = train_loss / len(train_loader)
+        history['train_loss'].append(avg_train_loss)
+        
+        # Validate
+        model.eval()
+        val_loss = 0.0
+        all_preds = []
+        all_labels = []
+        
+        with torch.no_grad():
+            for batch in val_loader:
+                input_ids = batch['input_ids'].to(device)
+                attention_mask = batch['attention_mask'].to(device)
+                labels = batch['labels'].to(device)
+                
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+                val_loss += outputs.loss.item()
+                preds = torch.argmax(outputs.logits, dim=1)
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+        
+        avg_val_loss = val_loss / len(val_loader)
+        val_acc = accuracy_score(all_labels, all_preds)
+        val_f1 = f1_score(all_labels, all_preds, average='weighted')
+        
+        history['val_loss'].append(avg_val_loss)
+        history['val_f1'].append(val_f1)
+        history['val_acc'].append(val_acc)
+        
+        print(f"\nTrain Loss: {avg_train_loss:.4f}")
+        print(f"Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}")
+        
+        scheduler.step(val_f1)
+        
+        # Save best model
+        if val_f1 > best_val_f1:
+            best_val_f1 = val_f1
+            torch.save({'model_state_dict': model.state_dict(), 'epoch': epoch, 'val_f1': val_f1}, output_dir / 'best_model.pt')
+            print(f"? Best model saved (F1: {best_val_f1:.4f})")
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            print(f"No improvement. Patience: {patience_counter}/{args.early_stopping_patience}")
+            if patience_counter >= args.early_stopping_patience:
+                print(f"\nEarly stopping at epoch {epoch + 1}")
+                break
+    
+    # Save history
+    with open(output_dir / 'training_history.json', 'w') as f:
+        json.dump(history, f, indent=2)
+    
+    # 7. Test evaluation
     print("\n" + "=" * 80)
-    print("? Evaluating on Test Set")
+    print("Evaluating on Test Set")
     print("=" * 80 + "\n")
     
-    test_results = trainer.evaluate(test_dataset)
+    # Load best model
+    checkpoint = torch.load(output_dir / 'best_model.pt')
+    model.load_state_dict(checkpoint['model_state_dict'])
+    print(f"Loaded best model from epoch {checkpoint['epoch'] + 1}")
+    
+    # Evaluate
+    model.eval()
+    all_preds = []
+    all_labels = []
+    all_probs = []
+    
+    with torch.no_grad():
+        for batch in test_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            probs = torch.softmax(logits, dim=1)
+            preds = torch.argmax(logits, dim=1)
+            
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+    
+    test_acc = accuracy_score(all_labels, all_preds)
+    test_f1 = f1_score(all_labels, all_preds, average='weighted')
+    test_precision = precision_score(all_labels, all_preds, average='weighted')
+    test_recall = recall_score(all_labels, all_preds, average='weighted')
+    
+    try:
+        all_probs = np.array(all_probs)
+        test_auc = roc_auc_score(all_labels, all_probs[:, 1])
+    except:
+        test_auc = 0.0
     
     print("\nTest Results:")
-    for key, value in test_results.items():
-        print(f"  {key}: {value:.4f}")
+    print(f"  Accuracy: {test_acc:.4f}")
+    print(f"  F1 Score: {test_f1:.4f}")
+    print(f"  Precision: {test_precision:.4f}")
+    print(f"  Recall: {test_recall:.4f}")
+    print(f"  AUC: {test_auc:.4f}")
     
-    # Save test results
-    test_results_file = Path(args.output) / 'test_results.json'
-    with open(test_results_file, 'w') as f:
+    test_results = {'test_accuracy': float(test_acc), 'test_f1': float(test_f1), 'test_precision': float(test_precision), 'test_recall': float(test_recall), 'test_auc': float(test_auc)}
+    with open(output_dir / 'test_results.json', 'w') as f:
         json.dump(test_results, f, indent=2)
-    print(f"\nTest results saved to: {test_results_file}")
+    print(f"\nTest results saved to: {output_dir / 'test_results.json'}")
     
-    # 8. Generate detailed classification report
+    # 8. Classification report
     print("\n" + "=" * 80)
-    print("? Generating Classification Report")
+    print("Generating Classification Report")
     print("=" * 80 + "\n")
     
-    predictions_output = trainer.predict(test_dataset)
-    predictions = np.argmax(predictions_output.predictions, axis=1)
-    labels = predictions_output.label_ids
-    
-    # Classification report
-    report = classification_report(
-        labels,
-        predictions,
-        target_names=['non-conserved', 'conserved'],
-        digits=4
-    )
+    report = classification_report(all_labels, all_preds, target_names=['non-conserved', 'conserved'], digits=4)
     print(report)
     
-    # Confusion matrix
-    cm = confusion_matrix(labels, predictions)
-    print("Confusion Matrix:")
+    cm = confusion_matrix(all_labels, all_preds)
+    print("\nConfusion Matrix:")
     print(cm)
     
-    # Save classification report
-    report_file = Path(args.output) / 'classification_report.txt'
-    with open(report_file, 'w') as f:
-        f.write("Classification Report\n")
-        f.write("=" * 80 + "\n\n")
-        f.write(report)
-        f.write("\n\nConfusion Matrix:\n")
-        f.write(str(cm))
-    print(f"\nClassification report saved to: {report_file}")
+    with open(output_dir / 'classification_report.txt', 'w') as f:
+        f.write("Classification Report\n" + "=" * 80 + "\n\n" + report + "\n\nConfusion Matrix:\n" + str(cm))
+    print(f"\nReport saved to: {output_dir / 'classification_report.txt'}")
     
     # 9. Save final model
     print("\n" + "=" * 80)
-    print("? Saving Final Model")
+    print("Saving Final Model")
     print("=" * 80 + "\n")
     
-    final_model_path = Path(args.output) / 'final_model'
-    trainer.save_model(str(final_model_path))
+    final_model_path = output_dir / 'final_model'
+    final_model_path.mkdir(parents=True, exist_ok=True)
+    torch.save({'model_state_dict': model.state_dict(), 'config': vars(args), 'test_results': test_results}, final_model_path / 'pytorch_model.bin')
+    with open(final_model_path / 'config.json', 'w') as f:
+        json.dump({'model_type': 'gpn', 'num_labels': args.num_labels, 'hidden_size': 768, 'classifier_dropout': args.classifier_dropout}, f, indent=2)
     print(f"Model saved to: {final_model_path}")
     
     print("\n" + "=" * 80)

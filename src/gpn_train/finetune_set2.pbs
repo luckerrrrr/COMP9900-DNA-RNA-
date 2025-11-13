@@ -45,7 +45,7 @@ echo "Batch Size: $BATCH_SIZE"
 echo "Learning Rate: $LEARNING_RATE"
 echo "========================================="
 
-# Run training
+# Run training (using manual training loop version to avoid Trainer API compatibility issues)
 apptainer exec --nv "$CONTAINER" python3 src/gpn_train/gpn_supervised.py \
     --data "$DATA_FILE" \
     --pretrained-model "$PRETRAINED_MODEL" \
