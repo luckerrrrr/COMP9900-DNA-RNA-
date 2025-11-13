@@ -4,7 +4,7 @@ from pathlib import Path
 import datetime
 
 # Generate timestamp string formatted as "HH-MM-SS"
-timestamp = datetime.datetime.now().strftime("%H-%M-%S")
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 # Project and environment configuration
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
