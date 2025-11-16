@@ -12,9 +12,12 @@ USER = os.environ.get('USER', 'unknown')
 MIDDLE_RESULT_DIR = Path(f"/srv/scratch/{USER}/middle_results")
 MIDDLE_RESULT_DIR_OUT = Path(f"/srv/scratch/{USER}/middle_results/{timestamp}")
 
-CHROM = "1"
-GTF = "dataset/gencode.v38.basic.annotation.gtf"
-FASTA = "dataset/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
+CHROM = "ALL"
+# GTF = "dataset/gencode.v38.basic.annotation.gtf"
+# GTF = "dataset/FineTuningSet1.txt"
+GTF = "dataset/FineTuningSet2.txt"
+# FASTA = "dataset/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
+FASTA = f"{MIDDLE_RESULT_DIR}/GRCh38.primary_assembly.genome.fa"
 PHASTCONS_FILE = "dataset/chr1.phastCons100way.wigFix"
 
 CONFIG = {
@@ -24,7 +27,7 @@ CONFIG = {
     },
     "data": {
         "window_len": 512,
-        "flanking": 100,
+        "flanking": 0,
         "step": 256,
         "stride": 64,
         "pad_token_id": 0,
