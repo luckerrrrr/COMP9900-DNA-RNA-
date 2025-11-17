@@ -24,6 +24,7 @@ umap-learn>=0.5.5
 tqdm>=4.66.0
 joblib>=1.3.2
 packaging>=23.0
+h5py>=3.10.0
 
 # --- GPN Hidden Dependencies ---
 biopython==1.81
