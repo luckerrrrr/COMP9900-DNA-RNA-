@@ -272,7 +272,67 @@ class FineTuningDataset(Dataset):
 
 
 # ============================================================================
-# 4. Metrics computation function
+# 4. Balanced downsampling function
+# ============================================================================
+
+def balanced_downsample(data, max_samples_per_class=None, downsample_ratio=None, seed=42):
+    """
+    Perform balanced downsampling on dataset
+    
+    Args:
+        data: List of data samples
+        max_samples_per_class: Maximum samples per class (1:1 ratio)
+        downsample_ratio: Ratio to keep (e.g., 0.1 = keep 10%)
+        seed: Random seed
+    
+    Returns:
+        Downsampled data list
+    """
+    np.random.seed(seed)
+    
+    # Separate by class
+    class_0_samples = [item for item in data if item['label'] == 0]
+    class_1_samples = [item for item in data if item['label'] == 1]
+    
+    print(f"Original distribution:")
+    print(f"  Class 0 (non-conserved): {len(class_0_samples):,}")
+    print(f"  Class 1 (conserved): {len(class_1_samples):,}")
+    
+    # Determine target size
+    if max_samples_per_class is not None:
+        target_size = max_samples_per_class
+    elif downsample_ratio is not None:
+        # Use minority class size as reference
+        min_class_size = min(len(class_0_samples), len(class_1_samples))
+        target_size = int(min_class_size * downsample_ratio)
+    else:
+        # Default: use minority class size (1:1 ratio)
+        target_size = min(len(class_0_samples), len(class_1_samples))
+    
+    # Sample from each class
+    sampled_0_indices = np.random.choice(len(class_0_samples), 
+                                         size=min(target_size, len(class_0_samples)), 
+                                         replace=False)
+    sampled_1_indices = np.random.choice(len(class_1_samples), 
+                                         size=min(target_size, len(class_1_samples)), 
+                                         replace=False)
+    
+    downsampled_data = ([class_0_samples[i] for i in sampled_0_indices] + 
+                        [class_1_samples[i] for i in sampled_1_indices])
+    
+    # Shuffle
+    np.random.shuffle(downsampled_data)
+    
+    print(f"\nDownsampled distribution:")
+    print(f"  Class 0 (non-conserved): {len(sampled_0_indices):,}")
+    print(f"  Class 1 (conserved): {len(sampled_1_indices):,}")
+    print(f"  Total: {len(downsampled_data):,} ({100*len(downsampled_data)/len(data):.2f}% of original)")
+    
+    return downsampled_data
+
+
+# ============================================================================
+# 5. Metrics computation function
 # ============================================================================
 
 def compute_metrics(eval_pred):
@@ -355,6 +415,14 @@ def main():
     parser.add_argument('--test-size', type=float, default=0.15, help="Test set size")
     parser.add_argument('--val-size', type=float, default=0.15, help="Validation set size")
     
+    # Data downsampling parameters
+    parser.add_argument('--downsample', action='store_true', 
+                       help="Enable balanced downsampling")
+    parser.add_argument('--max-samples-per-class', type=int, default=None,
+                       help="Max samples per class (for balanced sampling, 1:1 ratio)")
+    parser.add_argument('--downsample-ratio', type=float, default=None,
+                       help="Downsample ratio (e.g., 0.1 = keep 10% of data, balanced)")
+    
     args = parser.parse_args()
     
     print("=" * 80)
@@ -394,22 +462,82 @@ def main():
         max_length=args.max_length
     )
     
-    # Split dataset: train/val/test
+    # Apply balanced downsampling if requested
+    if args.downsample:
+        print("\n" + "=" * 80)
+        print("Applying Balanced Downsampling")
+        print("=" * 80 + "\n")
+        
+        # Get original data
+        original_data = full_dataset.data
+        
+        # Downsample
+        downsampled_data = balanced_downsample(
+            original_data,
+            max_samples_per_class=args.max_samples_per_class,
+            downsample_ratio=args.downsample_ratio,
+            seed=args.seed
+        )
+        
+        # Update dataset
+        full_dataset.data = downsampled_data
+        print(f"\nUsing {len(downsampled_data):,} samples for training")
+    
+    # Split dataset by gene_id to prevent data leakage
+    # Group samples by gene_id
+    from collections import defaultdict
+    gene_to_indices = defaultdict(list)
+    for idx in range(len(full_dataset.data)):
+        gene_id = full_dataset.data[idx].get('gene_id', f'sample_{idx}')  # Fallback if no gene_id
+        gene_to_indices[gene_id].append(idx)
+    
+    # Split genes (not samples) into train/val/test
+    genes = list(gene_to_indices.keys())
+    np.random.seed(args.seed)
+    np.random.shuffle(genes)
+    
+    n_genes = len(genes)
+    test_n_genes = int(n_genes * args.test_size)
+    val_n_genes = int(n_genes * args.val_size)
+    train_n_genes = n_genes - test_n_genes - val_n_genes
+    
+    train_genes = genes[:train_n_genes]
+    val_genes = genes[train_n_genes:train_n_genes + val_n_genes]
+    test_genes = genes[train_n_genes + val_n_genes:]
+    
+    # Collect sample indices for each split
+    train_indices = []
+    val_indices = []
+    test_indices = []
+    
+    for gene in train_genes:
+        train_indices.extend(gene_to_indices[gene])
+    for gene in val_genes:
+        val_indices.extend(gene_to_indices[gene])
+    for gene in test_genes:
+        test_indices.extend(gene_to_indices[gene])
+    
+    # Create subset datasets
+    from torch.utils.data import Subset
+    train_dataset = Subset(full_dataset, train_indices)
+    val_dataset = Subset(full_dataset, val_indices)
+    test_dataset = Subset(full_dataset, test_indices)
+    
     total_size = len(full_dataset)
-    test_size = int(total_size * args.test_size)
-    val_size = int(total_size * args.val_size)
-    train_size = total_size - test_size - val_size
+    print(f"\nDataset split (by gene_id to prevent data leakage):")
+    print(f"  Total genes: {n_genes}")
+    print(f"  Train genes: {len(train_genes)} ({100 * len(train_genes) / n_genes:.1f}%) -> {len(train_indices)} samples ({100 * len(train_indices) / total_size:.1f}%)")
+    print(f"  Val genes: {len(val_genes)} ({100 * len(val_genes) / n_genes:.1f}%) -> {len(val_indices)} samples ({100 * len(val_indices) / total_size:.1f}%)")
+    print(f"  Test genes: {len(test_genes)} ({100 * len(test_genes) / n_genes:.1f}%) -> {len(test_indices)} samples ({100 * len(test_indices) / total_size:.1f}%)")
     
-    print(f"\nDataset split:")
-    print(f"  Train: {train_size} ({100 * train_size / total_size:.1f}%)")
-    print(f"  Validation: {val_size} ({100 * val_size / total_size:.1f}%)")
-    print(f"  Test: {test_size} ({100 * test_size / total_size:.1f}%)")
-    
-    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
-        full_dataset,
-        [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(args.seed)
-    )
+    # Verify no gene overlap
+    train_gene_set = set(train_genes)
+    val_gene_set = set(val_genes)
+    test_gene_set = set(test_genes)
+    assert len(train_gene_set & val_gene_set) == 0, "Data leakage: train and val share genes!"
+    assert len(train_gene_set & test_gene_set) == 0, "Data leakage: train and test share genes!"
+    assert len(val_gene_set & test_gene_set) == 0, "Data leakage: val and test share genes!"
+    print("? No data leakage: all gene sets are disjoint!")
     
     # 4. Create data loaders  
     print("\n" + "=" * 80)
@@ -433,6 +561,19 @@ def main():
     print(f"Using device: {device}")
     
     model = model.to(device)
+    
+    # Calculate class weights to handle imbalanced data
+    train_labels = [full_dataset.data[idx]['label'] for idx in train_indices]
+    class_counts = np.bincount(train_labels)
+    class_weights = 1.0 / class_counts
+    class_weights = class_weights / class_weights.sum() * len(class_counts)  # Normalize
+    class_weights = torch.FloatTensor(class_weights).to(device)
+    
+    print(f"\nClass distribution in training set:")
+    for i, count in enumerate(class_counts):
+        label_name = "conserved" if i == 1 else "non-conserved"
+        print(f"  Class {i} ({label_name}): {count:,} samples ({100 * count / len(train_labels):.2f}%)")
+    print(f"Class weights: {class_weights.cpu().numpy()}")
     
     # Optimizer
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -460,14 +601,16 @@ def main():
         # Train
         model.train()
         train_loss = 0.0
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
         for batch_idx, batch in enumerate(train_loader):
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             labels = batch['labels'].to(device)
             
             optimizer.zero_grad()
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-            loss = outputs.loss
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            loss = criterion(logits, labels)  # Use weighted loss
             loss.backward()
             optimizer.step()
             
@@ -484,6 +627,7 @@ def main():
         val_loss = 0.0
         all_preds = []
         all_labels = []
+        val_criterion = nn.CrossEntropyLoss()  # No weights for validation
         
         with torch.no_grad():
             for batch in val_loader:
@@ -491,9 +635,11 @@ def main():
                 attention_mask = batch['attention_mask'].to(device)
                 labels = batch['labels'].to(device)
                 
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                val_loss += outputs.loss.item()
-                preds = torch.argmax(outputs.logits, dim=1)
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                logits = outputs.logits
+                loss = val_criterion(logits, labels)
+                val_loss += loss.item()
+                preds = torch.argmax(logits, dim=1)
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
         

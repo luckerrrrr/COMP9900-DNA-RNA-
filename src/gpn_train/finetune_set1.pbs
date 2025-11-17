@@ -14,8 +14,6 @@ module load singularity 2>/dev/null || true
 # Set environment variables
 export HF_HOME=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
 export TRANSFORMERS_CACHE=/home/z5618581/capstone-project-25t3-9900-f09c-donut/cache
-export ACCELERATE_TORCH_DEVICE=cuda
-export CUDA_VISIBLE_DEVICES=0
 
 # Change to project directory
 cd /home/z5618581/capstone-project-25t3-9900-f09c-donut || exit 1
@@ -45,7 +43,7 @@ echo "Batch Size: $BATCH_SIZE"
 echo "Learning Rate: $LEARNING_RATE"
 echo "========================================="
 
-# Run training (using manual training loop version to avoid Trainer API compatibility issues)
+# Run training
 apptainer exec --nv "$CONTAINER" python3 src/gpn_train/gpn_supervised.py \
     --data "$DATA_FILE" \
     --pretrained-model "$PRETRAINED_MODEL" \
@@ -71,4 +69,3 @@ echo "========================================="
 echo "Training completed!"
 echo "Results saved to: $OUTPUT_DIR"
 echo "========================================="
-
