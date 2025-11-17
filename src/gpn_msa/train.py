@@ -108,7 +108,7 @@ UNFREEZE_EPOCH = 3  # Don't unfreeze early → more stable optimization
 # Scientific Note:
 # Using at most MAX_WINDOWS_PER_PARENT windows per gene prevents sampling imbalance.
 # ------------------------------------------------------
-MAX_WINDOWS_PER_PARENT = 5
+MAX_WINDOWS_PER_PARENT = 1
 WINDOW = CONFIG["data"]["window_len"]
 
 # ------------------------------------------------------
@@ -343,7 +343,7 @@ def predict_chr1_lncrna(
     loader = GenomeLoader()
     msa_ds = loader.load_multiz100way_dataset(streaming=True)
 
-    pred_ds = SeqMsasDataset(df_windows, loader, msa_ds)
+    pred_ds = SeqMsasDataset(df_windows, msa_ds)
     pred_loader = DataLoader(
         pred_ds,
         batch_size=BATCH_SIZE,
@@ -850,9 +850,9 @@ def train_main():
     loader = GenomeLoader()
     msa_ds = loader.load_multiz100way_dataset(streaming=True)
 
-    train_ds = SeqMsasDataset(train_df, loader, msa_ds)
-    val_ds   = SeqMsasDataset(val_df, loader, msa_ds)
-    test_ds  = SeqMsasDataset(test_df, loader, msa_ds)
+    train_ds = SeqMsasDataset(train_df, msa_ds)
+    val_ds   = SeqMsasDataset(val_df, msa_ds)
+    test_ds  = SeqMsasDataset(test_df, msa_ds)
 
     train_loader = DataLoader(train_ds,BATCH_SIZE,shuffle=True,collate_fn=collate_msa)
     val_loader   = DataLoader(val_ds,BATCH_SIZE,shuffle=False,collate_fn=collate_msa)
