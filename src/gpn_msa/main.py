@@ -1,93 +1,257 @@
-from typing import Optional
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
+import os
+import re
+import datetime
 import pandas as pd
-import seaborn as sns
+import numpy as np
 from pathlib import Path
-
-from src.gpn_msa.backbone import GPNBackbone
-from src.gpn_msa.classifier import GPNClassifier
-from data.loader import GenomeLoader, MODEL_GPN_MSA_SAPIENS
-from gpn.data import Tokenizer
-
-from src.config import MIDDLE_RESULT_DIR, GTF, FASTA, CHROM, CONFIG, PHASTCONS_FILE, MIDDLE_RESULT_DIR_OUT
-from data.preprocess import GencodeWindowGenerator
-from utils.utils import print_section, debug_log
+import torch
 from sklearn.preprocessing import StandardScaler
+from data.loader import GenomeLoader
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from umap import UMAP
+import seaborn as sns
+
+
+# Generate timestamp string formatted as "HH-MM-SS"
+timestamp = datetime.datetime.now().strftime("%H-%M-%S")
+
+# Project and environment configuration
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+USER = os.environ.get('USER', 'unknown')
+MIDDLE_RESULT_DIR = Path(f"/srv/scratch/{USER}/middle_results")
+MIDDLE_RESULT_DIR_OUT = Path(f"/srv/scratch/{USER}/middle_results/{timestamp}")
+
+# Input dataset paths
+GTF_PATH = f"{PROJECT_ROOT}/dataset/gencode.v38.basic.annotation.gtf"
+WIGFIX_PATH = f"{PROJECT_ROOT}/dataset/chr1.phastCons100way.wigFix"
 
 # Device setup (GPU if available)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", DEVICE)
+BATCH_SIZE = 8 
 
-# ------------------------------------------------------
-# 以下为示例输入构造与 quick-run（可直接执行）
-# ------------------------------------------------------
-def make_mock_batch(batch_size: int = 2, seq_len: int = 512, aux_dim: int = 5, device: Optional[torch.device] = None):
+
+# ---------------------------- Utility Functions ---------------------------- #
+
+def print_section(title: str):
+    """Pretty print section titles for better console readability."""
+    print("\n" + "═" * 70)
+    print(f"{title:^70}")
+    print("═" * 70 + "\n")
+    
+
+def parse_attr(attr, key):
+    """Extract a specific key-value pair from a GTF attribute column."""
+    for a in attr.split(";"):
+        if key in a:
+            parts = a.split('"')
+            if len(parts) > 1:
+                return parts[1]
+    return None
+
+
+def debug_log(message: str, level: str = "INFO"):
     """
-    生成一个 mock 输入 batch 用于本地测试
-    返回:
-      input_ids: LongTensor [B, L]  (随机 small vocab)
-      aux_features: FloatTensor [B, L, F] (随机)
-      attention_mask: LongTensor [B, L] (全1 表示无 padding) 
-    说明: 这与实际 MSA tokenization 不同，只用于快速检查模型 forward 是否通顺
+    Print formatted debug messages with log level indicators.
+
+    Args:
+        message (str): Text to display in the log.
+        level (str): One of ["INFO", "WARN", "ERROR", "DEBUG", "SUCCESS"].
     """
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # 词表大小参照 dummy backbone 定义 (vocab_size = 32)
-    input_ids = torch.randint(1, 31, (batch_size, seq_len), dtype=torch.long, device=device)
-    aux = torch.randn(batch_size, seq_len, aux_dim, device=device)  # per-base features (e.g., phastCons, phyloP etc.)
-    attention_mask = torch.ones(batch_size, seq_len, dtype=torch.long, device=device)
-    return input_ids, aux, attention_mask
+    prefix = {
+        "INFO": "ℹ️ ",
+        "WARN": "⚠️ ",
+        "ERROR": "❌",
+        "DEBUG": "🔍",
+        "SUCCESS": "✅"
+    }.get(level, "  ")
+    print(f"{prefix} {message}")
 
-# debug & sanitize input_ids before passing to model
-def sanitize_input_ids(input_ids, backbone=None, tokenizer=None):
-    # input_ids: tensor on device (可能是 LongTensor 也可能不是)
-    if not torch.is_tensor(input_ids):
-        input_ids = torch.tensor(input_ids)
-    # 打印基本信息
-    print(">>> input_ids dtype:", input_ids.dtype, "shape:", input_ids.shape,
-          "min:", input_ids.min().item(), "max:", input_ids.max().item())
 
-    # 强制 long
-    if input_ids.dtype != torch.long:
-        input_ids = input_ids.long()
-        print(">>> converted input_ids to long")
+# ---------------------------- GENCODE Window Extraction ---------------------------- #
 
-    # 尝试获取 vocab_size / pad_id
-    vocab_size = None
-    pad_id = 0
-    try:
-        if backbone is not None and hasattr(backbone, "_hf_model"):
-            cfg = getattr(backbone._hf_model, "config", None)
-            if cfg is not None:
-                vocab_size = getattr(cfg, "vocab_size", None)
-        # 如果提供 tokenizer，可从 tokenizer 获取 pad_token_id
-        if tokenizer is not None:
-            pad_id = getattr(tokenizer, "pad_token_id", pad_id)
-    except Exception:
-        pass
-    print(">>> vocab_size:", vocab_size, "pad_id:", pad_id)
+def extract_gencode_windows(chrom: str, flanking=100, win=512, step=256):
+    """
+    Extract genome windows from the GENCODE annotation file for a given chromosome.
+    Regions include exon/CDS/UTR and lncRNA, each extended by a flanking region.
 
-    # 检查负值
-    if (input_ids < 0).any():
-        neg_count = int((input_ids < 0).sum().item())
-        print(f"⚠️ Found {neg_count} negative ids in input_ids. Replacing negatives with pad_id={pad_id}")
-        input_ids = input_ids.clone()
-        input_ids[input_ids < 0] = pad_id
+    Args:
+        chrom (str): Chromosome name (e.g., 'chr1').
+        flanking (int): Number of base pairs to extend upstream and downstream.
+        win (int): Sliding window size.
+        step (int): Step size between consecutive windows.
 
-    # 检查是否有值 >= vocab_size（若能拿到 vocab_size）
-    if vocab_size is not None and (input_ids >= vocab_size).any():
-        bad_count = int((input_ids >= vocab_size).sum().item())
-        print(f"⚠️ Found {bad_count} ids >= vocab_size ({vocab_size}). These will be clamped to {vocab_size-1}.")
-        input_ids = torch.clamp(input_ids, max=vocab_size-1)
+    Returns:
+        pd.DataFrame: Table of genomic windows with associated gene annotations.
+    """
+    csv_path = Path(MIDDLE_RESULT_DIR / f"{chrom}_windows.csv")
+    if csv_path.exists():
+        df = pd.read_csv(csv_path)
+        print(f"💾 Loaded {len(df)} windows from cache {csv_path}")
+        return df
+    
+    # 1️⃣ Load the GTF file
+    gtf = pd.read_csv(
+        GTF_PATH, sep="\t", comment="#", header=None,
+        names=["chr", "src", "feature", "start", "end", "score", "strand", "frame", "attr"]
+    )
 
-    return input_ids
+    # Filter target chromosome
+    gtf = gtf[gtf["chr"] == chrom]
+    print(f"✅ Loaded {len(gtf)} records from {chrom}")
+
+    # 2️⃣ Select relevant genomic features
+    target_features = ["exon", "CDS", "UTR", "lncRNA"]
+    selected = gtf[gtf["feature"].isin(target_features)].copy()
+
+    if len(selected) == 0:
+        print(f"⚠️ No exon/CDS/UTR/lncRNA features found for {chrom}")
+        return pd.DataFrame()
+
+    print(f"📌 Found {len(selected)} regions (exon/CDS/UTR/lncRNA combined)")
+
+    # 3️⃣ Generate sliding windows
+    windows = []
+    for _, r in selected.iterrows():
+        s = max(1, int(r["start"]) - flanking)
+        e = int(r["end"]) + flanking
+
+        gene_id = parse_attr(r["attr"], "gene_id")
+        gene_type = parse_attr(r["attr"], "gene_type")
+        region_type = r["feature"]
+
+        for pos in range(s, e - win + 1, step):
+            windows.append({
+                "chrom": chrom,
+                "start": pos,
+                "end": pos + win - 1,
+                "gene_id": gene_id,
+                "gene_type": gene_type,
+                "region": region_type
+            })
+
+    # 4️⃣ Remove duplicates
+    df = pd.DataFrame(windows).drop_duplicates(subset=["chrom", "start", "end", "gene_id", "region"])
+
+    # 5️⃣ Save generated windows to file
+    out = MIDDLE_RESULT_DIR_OUT / f"{chrom}_windows.csv"
+    df.to_csv(out, index=False)
+    print(f"💾 Saved {len(df)} windows → {out}")
+    return df
+    
+
+# ---------------------------- PhastCons WIGFIX Parser ---------------------------- #
+
+def parse_fixedstep_wigfix(wig_path, chrom_filter=None):
+    """
+    Parse fixedStep-format WIGFIX files into block-wise arrays.
+
+    Args:
+        wig_path (str): Path to the .wigFix file.
+        chrom_filter (str, optional): If provided, filter results to this chromosome only.
+
+    Returns:
+        dict: Mapping {chromosome -> list of (start, step, np.array(values))}.
+    """
+    wig_blocks = {}
+    cur_chrom = None
+    cur_start = None
+    cur_step = None
+    cur_vals = None
+    with open(wig_path, 'rt') as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith('fixedStep'):
+                # Flush previous block
+                if cur_chrom is not None and cur_vals is not None:
+                    wig_blocks.setdefault(cur_chrom, []).append((cur_start, cur_step, np.array(cur_vals, dtype=float)))
+                m_chrom = re.search(r'chrom=(\S+)', line)
+                m_start = re.search(r'start=(\d+)', line)
+                m_step = re.search(r'step=(\d+)', line)
+                if not (m_chrom and m_start and m_step):
+                    raise ValueError(f"Failed to parse fixedStep header: {line}")
+                cur_chrom = m_chrom.group(1)
+                cur_start = int(m_start.group(1))
+                cur_step = int(m_step.group(1))
+                cur_vals = []
+            elif line.startswith(('variableStep','track','#')):
+                continue
+            else:
+                try:
+                    cur_vals.append(float(line))
+                except:
+                    continue
+        # Flush last block
+        if cur_chrom is not None and cur_vals is not None:
+            wig_blocks.setdefault(cur_chrom, []).append((cur_start, cur_step, np.array(cur_vals, dtype=float)))
+    if chrom_filter:
+        wig_blocks = {k:v for k,v in wig_blocks.items() if k==chrom_filter}
+    return wig_blocks
+
+
+def mean_phastcons_from_wigfix_blocklist(chrom, start1, end1, wig_blocks):
+    """
+    Compute the mean phastCons value for a genomic region using pre-parsed wigFix blocks.
+    """
+    if chrom not in wig_blocks:
+        return float('nan')
+    total_sum = 0.0
+    total_count = 0
+    for b_start, b_step, arr in wig_blocks[chrom]:
+        if b_step == 1:
+            b_end = b_start + len(arr) - 1
+            ov_s = max(start1, b_start)
+            ov_e = min(end1, b_end)
+            if ov_s <= ov_e:
+                i0 = ov_s - b_start
+                i1 = ov_e - b_start
+                seg = arr[i0:i1+1]
+                total_sum += np.nansum(seg)
+                total_count += np.count_nonzero(~np.isnan(seg))
+        else:
+            kmin = int(np.ceil((start1 - b_start) / b_step)) if (start1 - b_start) > 0 else 0
+            kmax = int(np.floor((end1 - b_start) / b_step))
+            if kmax < kmin:
+                continue
+            kmin = max(kmin, 0)
+            kmax = min(kmax, len(arr)-1)
+            if kmin <= kmax:
+                seg = arr[kmin:kmax+1]
+                total_sum += np.nansum(seg)
+                total_count += np.count_nonzero(~np.isnan(seg))
+    if total_count == 0:
+        return float('nan')
+    return float(total_sum / total_count)
+
+
+def inject_phastcons(df_windows, wig_blocks, chrom_col='chrom', start_col='start', end_col='end', out_col='mean_phastCons'):
+    """
+    Inject mean phastCons scores into each genomic window.
+
+    Args:
+        df_windows (pd.DataFrame): DataFrame containing genomic windows.
+        wig_blocks (dict): Pre-parsed WIGFIX blocks.
+        chrom_col (str): Column containing chromosome name.
+        start_col (str): Column containing start position.
+        end_col (str): Column containing end position.
+        out_col (str): Column name to store computed mean phastCons values.
+
+    Returns:
+        pd.DataFrame: Updated DataFrame with an additional column for mean phastCons.
+    """
+    values = []
+    for _, r in df_windows.iterrows():
+        chrom = r[chrom_col]
+        s = int(r[start_col])
+        e = int(r[end_col])
+        meanv = mean_phastcons_from_wigfix_blocklist(chrom, s, e, wig_blocks)
+        values.append(meanv)
+    df = df_windows.copy()
+    df[out_col] = values
+    return df
 
 
 def compute_embeddings(df, chrom, sample_size=1000):
@@ -198,8 +362,8 @@ def compute_embeddings(df, chrom, sample_size=1000):
                 "end": e,
                 "gene_id": row.get("gene_id", None),
                 "gene_type": row.get("gene_type", None),
+                "region": row.get("region", None),
                 "mean_phastCons": row.get("mean_phastCons", 0),
-                "sequence": row.get("sequence", "")
             }
 
             emb_list.append(mean_emb)
@@ -231,12 +395,13 @@ def compute_embeddings(df, chrom, sample_size=1000):
 
     return result_df
 
+
 def run_umap_with_labels(emb_df):
     """
     Run UMAP dimensionality reduction on GPN-MSA embeddings.
 
     This function projects high-dimensional embeddings into 2D space
-    and visualizes them, colored by gene type, with lncRNA
+    and visualizes them, colored by gene type or region, with lncRNA
     highlighted distinctly.
 
     Args:
@@ -265,6 +430,7 @@ def run_umap_with_labels(emb_df):
 
     # 5️⃣ Construct UMAP output DataFrame
     umap_df = pd.DataFrame(coords, columns=["UMAP1", "UMAP2"])
+    umap_df["region"] = emb_df["region"]
     umap_df['gene_type'] = emb_df['gene_type'].astype(str).fillna('')
     umap_df['gene_type'] = umap_df['gene_type'].where(
         ~umap_df['gene_type'].str.contains('pseudogene', case=False, na=False),
@@ -308,7 +474,7 @@ def run_umap_with_labels(emb_df):
     patches = [Patch(facecolor=color, edgecolor='black', label=label) for label, color in palette.items()]
     plt.legend(
         handles=patches,
-        title="Gene Type",
+        title="region",
         loc="best",
         frameon=True,
         handlelength=2,
@@ -316,64 +482,38 @@ def run_umap_with_labels(emb_df):
     )
 
     plt.tight_layout()
-    out_img = MIDDLE_RESULT_DIR_OUT / f"umap_gene_type.png"
+    out_img = MIDDLE_RESULT_DIR_OUT / f"umap_region_lncRNA_fine.png"
     plt.savefig(out_img, dpi=600, bbox_inches="tight")
     plt.close()
 
     print(f"✅ Fine-grained UMAP saved → {out_img}")
 
 
-def example_run():
-    """
-    快速示例：构建 backbone + classifier，跑一遍前向并打印输出形状与数值样例。
-    保存该文件后直接运行: python gpn_backbone_classifier.py
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Device:", device)
-
-    # 1) 尝试加载真实 backbone（如果不可用会退回到 dummy）
-    #    model_name 可以改成你实际想用的 HF 模型
-    backbone = GPNBackbone(model_name=MODEL_GPN_MSA_SAPIENS, hidden_size=256, use_dummy_if_failed=True)
-    print("Using dummy backbone?" , backbone.using_dummy())
-
-    # 2) 构建 classifier wrapper
-    clf = GPNClassifier(backbone=backbone, head_hidden_ratio=0.5, dropout=0.1).to(device)
-
-    # 3) 准备 data
-    out_json = Path(f"{MIDDLE_RESULT_DIR}/human_gencode_windows.json")
-    window_df = []
-    if not out_json.exists():
-        flanking = CONFIG["data"]["flanking"]
-        win = CONFIG["data"]["window_len"]
-        step = CONFIG["data"]["step"]
-        gen = GencodeWindowGenerator(GTF, FASTA)
-        window_df = gen.run(chrom=CHROM, output_path=out_json, flanking=flanking, win=win, step=step, wig_path=PHASTCONS_FILE)
-    else:
-        window_df = pd.read_json(out_json)
-    
-    emb_df = compute_embeddings(window_df, "chr1", len(window_df))
-    run_umap_with_labels(emb_df)
-    
-    # loader = GenomeLoader()
-    # msa_ds = loader.load_multiz100way_dataset(streaming=True)
-    # msa = msa_ds.get_msa("6", 31575665, 31575793, strand="+", tokenize=True)
-    # msa = torch.tensor(np.expand_dims(msa, 0).astype(np.int64))
-    # input_ids, aux_features = msa[:, :, 0], msa[:, :, 1:]
-    # print(input_ids.shape, aux_features.shape)
-
-    # # 4) forward
-    # clf.eval()
-    # B, L = input_ids.shape
-    # attention_mask = torch.ones(B, L, dtype=torch.long, device=input_ids.device)
-    # with torch.no_grad():
-    #     logits = clf(input_ids=input_ids, aux_features=aux_features, attention_mask=attention_mask)  # [B]
-    #     probs = torch.sigmoid(logits)
-
-    # print("logits shape:", logits.shape)      # 期望: torch.Size([B])
-    # print("probs shape:", probs.shape)
-    # print("sample logits:", logits[:4].cpu().numpy())
-    # print("sample probs:", probs[:4].cpu().numpy())
-
+# ---------------------------- Main Execution Entry ---------------------------- #
 
 if __name__ == "__main__":
-    example_run()
+    chrom = "chr1"
+    os.mkdir(MIDDLE_RESULT_DIR_OUT)
+    phasctCon_file = Path(MIDDLE_RESULT_DIR_OUT / "sampled_pos_neg_windows_with_phastcons.csv")
+    conversation_file = Path(MIDDLE_RESULT_DIR_OUT / "chr1_window_conservation.csv")
+
+    # Step 1: Extract genomic windows from GENCODE
+    windows_df = extract_gencode_windows(chrom)
+    if windows_df is None or len(windows_df) == 0:
+        print("No windows generated.")
+    
+    # Step 2: Inject phastCons conservation scores if available
+    df = windows_df.copy()
+    if os.path.exists(WIGFIX_PATH):
+        print("Parsing wigFix file and injecting phastCons values (this may take a while)...")
+        wig_blocks = parse_fixedstep_wigfix(WIGFIX_PATH, chrom_filter='chr1')
+        combined_with_pc = inject_phastcons(df, wig_blocks)
+        combined_with_pc.to_csv(phasctCon_file, index=False)
+        print("Saved window set with phastCons scores to:", phasctCon_file)
+    else:
+        combined_with_pc = df
+        print("WIGFIX_PATH not found — skipping phastCons injection step.")
+        
+    # Step 3: Compute embeddings for all windows and visualize via UMAP
+    emb_df = compute_embeddings(combined_with_pc, "chr1", len(combined_with_pc))
+    run_umap_with_labels(emb_df)
