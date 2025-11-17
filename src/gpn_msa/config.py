@@ -13,13 +13,16 @@ MIDDLE_RESULT_DIR = Path(f"/srv/scratch/{USER}/middle_results")
 MIDDLE_RESULT_DIR_OUT = Path(f"/srv/scratch/{USER}/middle_results/{timestamp}")
 
 CHROM = "ALL"
-# GTF = "dataset/gencode.v38.basic.annotation.gtf"
-# GTF = "dataset/FineTuningSet1.txt"
-GTF = "dataset/FineTuningSet2.txt"
+# GTF_GENCODE = "dataset/gencode.v38.basic.annotation.gtf"
+# GTF_FINE_TUNE_SET1 = "dataset/FineTuningSet1.txt"
+GTF_FINE_TUNE_SET2 = "dataset/FineTuningSet2.txt"
 GTF_LNCRNA = "dataset/gencode.v38.long_noncoding_RNAs.gtf"
+GTF = GTF_FINE_TUNE_SET2
 # FASTA = "dataset/Homo_sapiens.GRCh38.dna.chromosome.1.fa"
-FASTA = f"{MIDDLE_RESULT_DIR}/GRCh38.primary_assembly.genome.fa"
+FASTA = f"dataset/GRCh38.primary_assembly.genome.fa"
 PHASTCONS_FILE = "dataset/chr1.phastCons100way.wigFix"
+
+MSA_BEST_MODEL = "model_results/best_models/gpn_msa/best_{SET_NAME}.pt"
 
 CONFIG = {
     "model": {
