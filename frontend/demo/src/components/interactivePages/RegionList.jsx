@@ -47,7 +47,7 @@ export default function RegionList({
         {/* title */}
         <h3
           style={{
-            fontSize: "20px",
+            fontSize: "30px",
             fontWeight: "bold",
             color: "#64b5f6",
             marginBottom: "20px",
@@ -61,10 +61,12 @@ export default function RegionList({
         <div
           className="region-cards-scroll"
           style={{
-            maxHeight: "480px", 
+            maxHeight: "480px",
             overflowY: "auto",
             marginBottom: "16px",
-            paddingRight: "8px", 
+            paddingRight: "20px",
+            marginLeft: "-14px",
+            paddingLeft: "10px",
           }}
         >
           {regions.map((region, index) => (

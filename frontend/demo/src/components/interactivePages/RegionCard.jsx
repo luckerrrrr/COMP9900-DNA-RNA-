@@ -6,7 +6,7 @@ export default function RegionCard({ region, index, isSelected, onClick }) {
       whileHover={{ scale: 1.02 }}
       onClick={onClick}
       style={{
-        padding: "20px",
+        padding: "18px",
         background: isSelected
           ? "rgba(100, 181, 246, 0.2)"
           : "rgba(255, 255, 255, 0.05)",
