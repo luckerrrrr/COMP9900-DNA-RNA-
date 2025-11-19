@@ -50,7 +50,7 @@ export default function InteractivePage() {
           borderRadius: "8px",
           color: "#fff",
           cursor: "pointer",
-          fontSize: "16px",
+          fontSize: "22px",
           zIndex: 1000,
           fontWeight: "600",
         }}
@@ -85,7 +85,7 @@ export default function InteractivePage() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.2 }}
           style={{
-            fontSize: "18px",
+            fontSize: "25px",
             textAlign: "center",
             color: "#aaa",
             marginBottom: "30px",

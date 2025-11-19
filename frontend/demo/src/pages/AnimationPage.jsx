@@ -15,12 +15,12 @@ export default function AnimationPage() {
 
 
   const steps = [
-    { component: Step1DataPreprocessing },
-    { component: Step3Tokenisation },
-    { component: Step2MSAAlignment },
-    { component: Step4Embedding },
-    { component: Step5Classification },
-    { component: Step6Evaluation },
+    { component: Step1DataPreprocessing, duration: 2000 },
+    { component: Step3Tokenisation, duration: 2000 },
+    { component: Step2MSAAlignment, duration: 2000 },
+    { component: Step4Embedding, duration: 2000 },
+    { component: Step5Classification, duration: 5000 }, 
+    { component: Step6Evaluation, duration: 2000 },
   ];
 
 
@@ -29,10 +29,12 @@ export default function AnimationPage() {
 
   useEffect(() => {
     if (currentStep < steps.length) {
+      const currentDuration = steps[currentStep]?.duration || 2000; // ← 使用当前步骤的时长
+
       const timer = setTimeout(() => {
         setCurrentStep(currentStep + 1);
         setCompletedSteps((prev) => [...prev, currentStep]);
-      }, 2000);
+      }, currentDuration); 
 
       return () => clearTimeout(timer);
     }
@@ -64,7 +66,7 @@ export default function AnimationPage() {
           borderRadius: "8px",
           color: "#fff",
           cursor: "pointer",
-          fontSize: "16px",
+          fontSize: "22px",
           zIndex: 1000,
           fontWeight: "600",
         }}
@@ -207,7 +209,7 @@ export default function AnimationPage() {
                 borderRadius: "8px",
                 color: "#fff",
                 cursor: "pointer",
-                fontSize: "16px",
+                fontSize: "20px",
                 fontWeight: "600",
               }}
             >

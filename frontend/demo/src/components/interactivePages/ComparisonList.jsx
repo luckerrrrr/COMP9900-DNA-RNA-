@@ -25,7 +25,7 @@ export default function ComparisonList({
           {/* Title */}
           <h3
             style={{
-              fontSize: "24px",
+              fontSize: "30px",
               fontWeight: "bold",
               color: "#64b5f6",
               marginBottom: "24px",
@@ -58,7 +58,7 @@ export default function ComparisonList({
                       textAlign: "center",
                       color: "#64b5f6",
                       fontWeight: "600",
-                      fontSize: "15px",
+                      fontSize: "25px",
                     }}
                   >
                     Rank
@@ -69,7 +69,7 @@ export default function ComparisonList({
                       textAlign: "left",
                       color: "#64b5f6",
                       fontWeight: "600",
-                      fontSize: "15px",
+                      fontSize: "25px",
                     }}
                   >
                     GPN Region
@@ -80,7 +80,7 @@ export default function ComparisonList({
                       textAlign: "center",
                       color: "#64b5f6",
                       fontWeight: "600",
-                      fontSize: "15px",
+                      fontSize: "25px",
                     }}
                   >
                     GPN Score
@@ -91,7 +91,7 @@ export default function ComparisonList({
                       textAlign: "left",
                       color: "#66bb6a",
                       fontWeight: "600",
-                      fontSize: "15px",
+                      fontSize: "25px",
                     }}
                   >
                     GPN-MSA Region
@@ -102,7 +102,7 @@ export default function ComparisonList({
                       textAlign: "center",
                       color: "#66bb6a",
                       fontWeight: "600",
-                      fontSize: "15px",
+                      fontSize: "25px",
                     }}
                   >
                     GPN-MSA Score
@@ -139,7 +139,7 @@ export default function ComparisonList({
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: "16px",
+                            fontSize: "20px",
                             fontWeight: "bold",
                             color: "#64b5f6",
                             margin: "0 auto",
@@ -153,7 +153,7 @@ export default function ComparisonList({
                       <td style={{ padding: "16px 12px" }}>
                         <div
                           style={{
-                            fontSize: "13px",
+                            fontSize: "20px",
                             color: "#aaa",
                             marginBottom: "4px",
                           }}
@@ -163,7 +163,7 @@ export default function ComparisonList({
                         </div>
                         <div
                           style={{
-                            fontSize: "15px",
+                            fontSize: "20px",
                             fontWeight: "600",
                             color: "#fff",
                           }}
@@ -181,7 +181,7 @@ export default function ComparisonList({
                       >
                         <div
                           style={{
-                            fontSize: "18px",
+                            fontSize: "22px",
                             fontWeight: "bold",
                             color: "#64b5f6",
                             marginBottom: "4px",
@@ -191,7 +191,7 @@ export default function ComparisonList({
                         </div>
                         <div
                           style={{
-                            fontSize: "11px",
+                            fontSize: "20px",
                             color: "#888",
                           }}
                         >
@@ -203,7 +203,7 @@ export default function ComparisonList({
                       <td style={{ padding: "16px 12px" }}>
                         <div
                           style={{
-                            fontSize: "13px",
+                            fontSize: "20px",
                             color: "#aaa",
                             marginBottom: "4px",
                           }}
@@ -214,7 +214,7 @@ export default function ComparisonList({
                         </div>
                         <div
                           style={{
-                            fontSize: "15px",
+                            fontSize: "20px",
                             fontWeight: "600",
                             color: "#fff",
                           }}
@@ -232,7 +232,7 @@ export default function ComparisonList({
                       >
                         <div
                           style={{
-                            fontSize: "18px",
+                            fontSize: "20px",
                             fontWeight: "bold",
                             color: "#66bb6a",
                             marginBottom: "4px",
@@ -242,7 +242,7 @@ export default function ComparisonList({
                         </div>
                         <div
                           style={{
-                            fontSize: "11px",
+                            fontSize: "22px",
                             color: "#888",
                           }}
                         >
@@ -270,7 +270,7 @@ export default function ComparisonList({
               border: "1px solid rgba(100, 181, 246, 0.2)",
               textAlign: "center",
               color: "#aaa",
-              fontSize: "14px",
+              fontSize: "22px",
             }}
           >
             💡 GPN-MSA generally shows higher conservation scores by

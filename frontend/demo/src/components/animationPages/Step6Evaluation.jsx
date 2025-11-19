@@ -36,7 +36,7 @@ export default function Step6Evaluation({ isActive, isCompleted }) {
           gap: "16px",
         }}
       >
-        {/* 两个柱状图 */}
+
         {[
           { label: "GPN", height: 70, color: "#64b5f6" },
           { label: "GPN-MSA", height: 90, color: "#66bb6a" },

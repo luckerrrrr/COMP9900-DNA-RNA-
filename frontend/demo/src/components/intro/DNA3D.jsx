@@ -4,12 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
 /**
- * Custom hook to generate the 3D coordinates of a helix curve.
- * - turns: how many rotations the helix makes
- * - length: the total length of the helix
- * - radius: radius of the helix spiral
- * - samples: number of points used to construct the curve
- * - phase: horizontal shift to create a second strand
+ * Generate 3D helix points
  */
 function useHelix({
   turns = 2.0,
@@ -32,66 +27,34 @@ function useHelix({
 }
 
 /**
- * A single strand of the DNA helix using instanced spheres.
- * We use instancing to render many small spheres efficiently.
- * The animation gives a subtle "breathing" motion to the helix.
+ * Smooth tube-based DNA strand for realistic 3D look
  */
-function HelixStrand({ phase = 0, color = "#ffffff" }) {
+function HelixStrandTube({ phase = 0, color = "#7cc7ff" }) {
   const pts = useHelix({ phase });
-  const inst = useRef();
-  const o = new THREE.Object3D();
 
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-
-      // Slight pulsating motion along y and z
-      o.position.set(
-        p.x,
-        p.y * (1 + 0.02 * Math.sin(t + i * 0.15)),
-        p.z * (1 + 0.02 * Math.cos(t + i * 0.15))
-      );
-
-      // Small scale pulsation for each sphere
-      const s = 0.05 + 0.01 * Math.sin(i * 0.25 + t);
-      o.scale.setScalar(s);
-
-      // Apply transformation to the instanced mesh
-      o.updateMatrix();
-      inst.current.setMatrixAt(i, o.matrix);
-    }
-    inst.current.instanceMatrix.needsUpdate = true;
-  });
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const tube = new THREE.TubeGeometry(curve, 400, 0.07, 20, false);
 
   return (
-    <instancedMesh ref={inst} args={[null, null, pts.length]}>
-      <sphereGeometry args={[1, 12, 12]} />
+    <mesh geometry={tube}>
       <meshStandardMaterial
         color={color}
+        metalness={0.75}
+        roughness={0.18}
         emissive={color}
-        emissiveIntensity={0.55}
-        transparent
-        opacity={0.95}
-        roughness={0.15}
-        metalness={0.35}
+        emissiveIntensity={0.45}
+        envMapIntensity={1.2}
       />
-    </instancedMesh>
+    </mesh>
   );
 }
 
 /**
- * Creates the horizontal rungs (ladder steps) between the two DNA strands.
- * Uses cylinders positioned and rotated between paired points.
+ * Horizontal rungs between two strands
  */
 function Rungs({ color = "#ffffff" }) {
   const a = useHelix({ phase: 0, samples: 26 });
   const b = useHelix({ phase: Math.PI, samples: 26 });
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    transparent: true,
-    opacity: 0.6,
-  });
 
   return (
     <group>
@@ -100,8 +63,14 @@ function Rungs({ color = "#ffffff" }) {
         const mid = pa.clone().add(pb).multiplyScalar(0.5);
         const len = pa.distanceTo(pb);
 
-        // Create a cylinder between two points
-        const geo = new THREE.CylinderGeometry(0.01, 0.01, len, 8);
+        const geo = new THREE.CylinderGeometry(0.03, 0.03, len, 16);
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.25,
+          metalness: 0.4,
+          opacity: 0.9,
+          transparent: true,
+        });
         const m = new THREE.Mesh(geo, mat);
         m.position.copy(mid);
         m.lookAt(pb);
@@ -113,39 +82,35 @@ function Rungs({ color = "#ffffff" }) {
 }
 
 /**
- * Rotates and animates the entire DNA structure over time.
- * This gives the DNA a dynamic, floating feel.
+ * Entire rotating DNA group
  */
-function MovingDNA() {
+function MovingDNATube() {
   const g = useRef();
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (!g.current) return;
 
-    // Gentle oscillation of the DNA
-    g.current.rotation.x = 0.3 + Math.sin(t * 0.4) * 0.05;
-    g.current.rotation.y = Math.cos(t * 0.3) * 0.06;
+    g.current.rotation.x = 0.25 + Math.sin(t * 0.4) * 0.06;
+    g.current.rotation.y = Math.cos(t * 0.3) * 0.08;
+    g.current.position.y = Math.sin(t * 0.6) * 0.15; // floating motion
   });
 
   return (
     <group ref={g} scale={2} position={[3, 0, 0]}>
-      <HelixStrand phase={0} />
-      <HelixStrand phase={Math.PI} />
+      <HelixStrandTube phase={0} color="#7cc7ff" />
+      <HelixStrandTube phase={Math.PI} color="#ff6ca8" />
       <Rungs />
     </group>
   );
 }
 
 /**
- * Main DNA3D component:
- * - Sets up the Three.js scene using @react-three/fiber
- * - Adds lighting and controls
- * - Renders the MovingDNA component as the centerpiece
+ * Full DNA component with lighting + environment + fog
  */
 export default function DNA3D({
   width = "min(960px, 90vw)",
-  height = "500px",
+  height = "520px",
 }) {
   return (
     <div style={{ width, height }}>
@@ -154,14 +119,36 @@ export default function DNA3D({
         gl={{ alpha: true }}
         style={{ background: "transparent" }}
       >
-        {/* Ambient and directional lighting for soft highlights */}
-        <ambientLight intensity={0.9} />
-        <directionalLight position={[2, 2, 2]} intensity={1.2} />
+        {/* --- GLOBAL FOG FOR DEPTH (立体深度感核心) --- */}
+        <fog attach="fog" args={["#000000", 5, 22]} />
 
-        {/* Rotating DNA */}
-        <MovingDNA />
+        {/* --- LIGHTING SETUP --- */}
+        <ambientLight intensity={0.6} />
 
-        {/* Disable zoom/pan for a fixed camera experience */}
+        {/* Key light */}
+        <directionalLight
+          position={[4, 3, 4]}
+          intensity={1.4}
+          color="#bcd9ff"
+        />
+
+        {/* Rim light for 3D highlight */}
+        <directionalLight
+          position={[-3, -2, -4]}
+          intensity={0.9}
+          color="#d8a6ff"
+        />
+
+        {/* Fill light */}
+        <directionalLight
+          position={[0, 2, -3]}
+          intensity={0.8}
+          color="#88aaff"
+        />
+
+        {/* DNA */}
+        <MovingDNATube />
+
         <OrbitControls enableZoom={false} enablePan={false} />
       </Canvas>
     </div>

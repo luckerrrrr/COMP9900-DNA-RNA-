@@ -18,10 +18,10 @@ export default function RegionCard({ region, index, isSelected, onClick }) {
         marginBottom: "12px",
       }}
     >
-      {/* location Info */}
+      {/* region Info */}
       <div
         style={{
-          fontSize: "14px",
+          fontSize: "20px",
           color: "#aaa",
           marginBottom: "8px",
         }}
@@ -33,7 +33,7 @@ export default function RegionCard({ region, index, isSelected, onClick }) {
       {/* Gene name */}
       <div
         style={{
-          fontSize: "18px",
+          fontSize: "20px",
           fontWeight: "600",
           color: "#fff",
         }}

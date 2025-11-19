@@ -26,172 +26,249 @@ export default function Step5Classification({ isActive, isCompleted }) {
         gap: "20px",
       }}
     >
-      <div
+      <motion.div
+        animate={
+          isActive
+            ? { opacity: [0, 1, 1, 0], scale: [0.9, 1, 1, 0.9] }
+            : isCompleted
+            ? { opacity: 0, scale: 0.9 }
+            : { opacity: 0, scale: 0.9 }
+        }
+        transition={{
+          duration: 4,
+          times: [0, 0.15, 0.85, 1],
+        }}
         style={{
-          width: "220px",
+          width: "200px",
           height: "140px",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
+          gap: "8px",
           position: "relative",
         }}
       >
-        {/* Linear Classifier 盒子 - 闪烁然后消失 */}
+        {/* Layer 1: Linear */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "rgba(100, 181, 246, 0.2)",
+            border: "1px solid rgba(100, 181, 246, 0.5)",
+            borderRadius: "8px",
+            textAlign: "center",
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#64b5f6",
+          }}
+        >
+          Linear
+        </motion.div>
+
         <motion.div
           animate={
             isActive
               ? {
-                  scale: [1, 1.1, 1.1, 0.3],
-                  opacity: [1, 1, 1, 0],
+                  y: [0, 18],
+                  opacity: [0, 1, 1, 0],
                 }
-              : isCompleted
-              ? { scale: 0.3, opacity: 0 } 
-              : { scale: 1, opacity: 1 }
+              : { y: 0, opacity: 0 }
           }
           transition={{
-            duration: 1.2,
-            times: [0, 0.3, 0.6, 1],
+            duration: 0.8,
+            delay: 1,
+            ease: "easeInOut",
           }}
           style={{
+            width: "8px",
+            height: "8px",
+            background: "#64b5f6",
+            borderRadius: "50%",
             position: "absolute",
-            padding: "16px 24px",
-            background: "rgba(100, 181, 246, 0.2)",
-            border: "2px solid #64b5f6",
-            borderRadius: "10px",
+            top: "38px",
+          }}
+        />
+
+        {/* Layer 2: ReLU/GELU */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+          transition={{ duration: 0.5, delay: 0.7 }}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "rgba(102, 187, 106, 0.2)",
+            border: "1px solid rgba(102, 187, 106, 0.5)",
+            borderRadius: "8px",
             textAlign: "center",
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#66bb6a",
           }}
         >
-          <div
-            style={{
-              fontSize: "16px",
-              fontWeight: "bold",
-              color: "#64b5f6",
-              marginBottom: "6px",
-            }}
-          >
-            Linear Classifier
-          </div>
-          <div
-            style={{
-              fontSize: "13px",
-              color: "#81c9f6",
-              fontFamily: "monospace",
-            }}
-          >
-            y = W·x + b
-          </div>
+          ReLU/GELU
         </motion.div>
-        {/* 二分类结果 */}
+
         <motion.div
           animate={
-            isActive || isCompleted
-              ? { opacity: 1, scale: 1 }
-              : { opacity: 0, scale: 0 }
+            isActive
+              ? {
+                  y: [0, 18],
+                  opacity: [0, 1, 1, 0],
+                }
+              : { y: 0, opacity: 0 }
           }
-          transition={{ duration: 0.6, delay: 1 }}
+          transition={{
+            duration: 0.8,
+            delay: 2,
+            ease: "easeInOut",
+          }}
           style={{
-            display: "flex",
-            gap: "16px",
+            width: "8px",
+            height: "8px",
+            background: "#66bb6a",
+            borderRadius: "50%",
             position: "absolute",
+            top: "90px",
+          }}
+        />
+
+        {/* Layer 3: Linear */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+          transition={{ duration: 0.8, delay: 1.1 }}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "rgba(255, 152, 0, 0.2)",
+            border: "1px solid rgba(255, 152, 0, 0.5)",
+            borderRadius: "8px",
+            textAlign: "center",
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#ff9800",
           }}
         >
-          {/* Conserved - 高概率 */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <div
-              style={{
-                width: "70px",
-                height: "70px",
-                background: "linear-gradient(135deg, #66bb6a 0%, #4caf50 100%)",
-                borderRadius: "10px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(102, 187, 106, 0.3)",
-              }}
-            >
-              <div style={{ fontSize: "28px", color: "#fff", lineHeight: 1 }}>
-                ✓
-              </div>
-              <div
-                style={{
-                  fontSize: "20px",
-                  fontWeight: "bold",
-                  color: "#fff",
-                  marginTop: "4px",
-                }}
-              >
-                94%
-              </div>
-            </div>
-            <span
-              style={{
-                fontSize: "13px",
-                fontWeight: "600",
-                color: "#66bb6a",
-              }}
-            >
-              Conserved
-            </span>
-          </div>
-
-          {/* Non-conserved - 低概率 */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <div
-              style={{
-                width: "70px",
-                height: "30px",
-                background: "linear-gradient(135deg, #ef5350 0%, #e53935 100%)",
-                borderRadius: "10px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 2px 8px rgba(239, 83, 80, 0.3)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                  color: "#fff",
-                }}
-              >
-                6%
-              </div>
-            </div>
-            <span
-              style={{
-                fontSize: "13px",
-                fontWeight: "600",
-                color: "#ef5350",
-              }}
-            >
-              Other
-            </span>
-          </div>
+          Linear
         </motion.div>
-      </div>
+      </motion.div>
 
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={
+          isActive || isCompleted
+            ? { opacity: 1, scale: 1 }
+            : { opacity: 0, scale: 0.8 }
+        }
+        transition={{ duration: 0.6, delay: 4 }}
+        style={{
+          display: "flex",
+          gap: "12px",
+          position: "absolute",
+        }}
+      >
+        {/* Conserved */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <div
+            style={{
+              width: "60px",
+              height: "60px",
+              background: "linear-gradient(135deg, #66bb6a 0%, #4caf50 100%)",
+              borderRadius: "10px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(102, 187, 106, 0.3)",
+            }}
+          >
+            <div style={{ fontSize: "26px", color: "#fff", lineHeight: 1 }}>
+              ✓
+            </div>
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: "bold",
+                color: "#fff",
+                marginTop: "2px",
+              }}
+            >
+              94%
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: "600",
+              color: "#66bb6a",
+            }}
+          >
+            Conserved
+          </span>
+        </div>
+
+        {/* Non-conserved */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <div
+            style={{
+              width: "60px",
+              height: "28px",
+              background: "linear-gradient(135deg, #ef5350 0%, #e53935 100%)",
+              borderRadius: "10px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(239, 83, 80, 0.3)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "15px",
+                fontWeight: "bold",
+                color: "#fff",
+              }}
+            >
+              6%
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: "600",
+              color: "#ef5350",
+            }}
+          >
+            Other
+          </span>
+        </div>
+      </motion.div>
+
+      {/* Title */}
       <div style={{ textAlign: "center" }}>
         <h3 style={{ fontSize: "26px", fontWeight: "700", margin: 0 }}>
           Classification
         </h3>
-        <p style={{ fontSize: "19px", color: "#aaa", margin: 0 }}>
-          Binary (0 or 1)
+        <p style={{ fontSize: "16px", color: "#aaa", margin: 0 }}>
+          Conserved or Not
         </p>
       </div>
     </motion.div>

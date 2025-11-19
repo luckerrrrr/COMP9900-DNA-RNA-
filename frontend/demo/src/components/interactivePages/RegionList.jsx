@@ -96,7 +96,7 @@ export default function RegionList({
             border: "1px solid #64b5f6",
             borderRadius: "8px",
             color: "#64b5f6",
-            fontSize: "16px",
+            fontSize: "20px",
             fontWeight: "600",
             cursor: "pointer",
           }}

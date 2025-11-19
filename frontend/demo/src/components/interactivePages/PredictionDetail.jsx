@@ -12,7 +12,7 @@ export default function PredictionDetail({ region, modelName }) {
           border: "1px solid rgba(255, 255, 255, 0.1)",
           textAlign: "center",
           color: "#aaa",
-          fontSize: "18px",
+          fontSize: "30px",
         }}
       >
         Select a region to view prediction details
@@ -62,7 +62,7 @@ export default function PredictionDetail({ region, modelName }) {
       >
         <div
           style={{
-            fontSize: "18px",
+            fontSize: "20px",
             color: "#64b5f6",
             fontWeight: "600",
             marginBottom: "8px",
@@ -71,7 +71,7 @@ export default function PredictionDetail({ region, modelName }) {
           {region.chr}:{region.start.toLocaleString()}-
           {region.end.toLocaleString()}
         </div>
-        <div style={{ fontSize: "16px", color: "#aaa" }}>
+        <div style={{ fontSize: "20px", color: "#aaa" }}>
           Gene: {region.gene}
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function PredictionDetail({ region, modelName }) {
             }}
           >
             <span
-              style={{ fontSize: "16px", color: "#fff", fontWeight: "600" }}
+              style={{ fontSize: "20px", color: "#fff", fontWeight: "600" }}
             >
               {modelName} Prediction
             </span>
@@ -136,7 +136,7 @@ export default function PredictionDetail({ region, modelName }) {
             }}
           >
             <span
-              style={{ fontSize: "16px", color: "#fff", fontWeight: "600" }}
+              style={{ fontSize: "20px", color: "#fff", fontWeight: "600" }}
             >
               PhastCons Score
             </span>
@@ -193,7 +193,7 @@ export default function PredictionDetail({ region, modelName }) {
         </div>
         <div
           style={{
-            fontSize: "24px",
+            fontSize: "26px",
             fontWeight: "bold",
             color: isHighlyConserved ? "#66bb6a" : "#ff9800",
             marginBottom: "12px",
@@ -201,7 +201,7 @@ export default function PredictionDetail({ region, modelName }) {
         >
           {isHighlyConserved ? "Highly Conserved" : "Moderately Conserved"}
         </div>
-        <div style={{ fontSize: "14px", color: "#aaa", lineHeight: 1.6 }}>
+        <div style={{ fontSize: "20px", color: "#aaa", lineHeight: 1.6 }}>
           {modelName} detected{" "}
           {region.predProb > region.phastcons
             ? "higher conservation than traditional PhastCons method"

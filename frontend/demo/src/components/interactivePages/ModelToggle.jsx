@@ -27,7 +27,7 @@ export default function ModelToggle({ selectedModel, onModelChange }) {
             }`,
             borderRadius: "8px",
             color: selectedModel === model ? "#64b5f6" : "#fff",
-            fontSize: "16px",
+            fontSize: "20px",
             fontWeight: "600",
             cursor: "pointer",
           }}

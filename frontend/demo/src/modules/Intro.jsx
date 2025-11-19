@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import DNA3D from "../components/intro/DNA3D";
-import { FcLineChart } from "react-icons/fc";
-import { FcFilmReel } from "react-icons/fc";
+
 
 export default function Module1Intro() {
   const navigate = useNavigate();
@@ -109,7 +108,7 @@ export default function Module1Intro() {
               minWidth: "160px",
             }}
           >
-            <FcLineChart /> Animated Explanation
+             Animated Explanation
           </motion.button>
 
           <motion.button
@@ -132,7 +131,7 @@ export default function Module1Intro() {
               minWidth: "160px",
             }}
           >
-            <FcFilmReel /> Interactive Exploration
+            Interactive Exploration
           </motion.button>
         </motion.div>
       </div>
