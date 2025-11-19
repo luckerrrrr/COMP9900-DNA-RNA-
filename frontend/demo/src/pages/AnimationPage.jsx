@@ -15,12 +15,12 @@ export default function AnimationPage() {
 
 
   const steps = [
-    { component: Step1DataPreprocessing },  
-    { component: Step2MSAAlignment },       
-    { component: Step3Tokenisation },      
-    { component: Step4Embedding },         
-    { component: Step5Classification },    
-    { component: Step6Evaluation },        
+    { component: Step1DataPreprocessing },
+    { component: Step3Tokenisation },
+    { component: Step2MSAAlignment },
+    { component: Step4Embedding },
+    { component: Step5Classification },
+    { component: Step6Evaluation },
   ];
 
 

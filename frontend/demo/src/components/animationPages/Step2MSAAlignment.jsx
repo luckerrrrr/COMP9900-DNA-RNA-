@@ -26,7 +26,7 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
         gap: "20px",
       }}
     >
-      {/* 动画区域 */}
+
       <div
         style={{
           width: "220px",
@@ -37,7 +37,7 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
           position: "relative",
         }}
       >
-        {/* 左侧：GPN - 单序列 */}
+
         <div
           style={{
             flex: 1,
@@ -47,7 +47,7 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
             gap: "10px",
           }}
         >
-          {/* GPN 标题 */}
+
           <div
             style={{
               fontSize: "15px",
@@ -58,7 +58,7 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
             GPN
           </div>
 
-          {/* 单条序列 */}
+
           <motion.div
             animate={isActive ? { opacity: 1 } : { opacity: 1 }}
             transition={{ duration: 0.6 }}
@@ -69,7 +69,7 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
               marginTop: "12px",
             }}
           >
-            {/* 一条 token 序列 */}
+ 
             <div style={{ display: "flex", gap: "2px" }}>
               {[0, 1, 2, 3, 4].map((j) => (
                 <div
@@ -89,7 +89,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
                 />
               ))}
             </div>
-            {/* 512 标签 */}
             <div
               style={{
                 fontSize: "10px",
@@ -103,7 +102,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
           </motion.div>
         </div>
 
-        {/* 中间分隔线 */}
         <div
           style={{
             width: "2px",
@@ -112,7 +110,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
           }}
         />
 
-        {/* 右侧：GPN-MSA - 多物种对齐 */}
         <div
           style={{
             flex: 1,
@@ -122,7 +119,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
             gap: "8px",
           }}
         >
-          {/* GPN-MSA 标题 */}
           <div
             style={{
               fontSize: "15px",
@@ -133,7 +129,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
             GPN-MSA
           </div>
 
-          {/* Aux Features 标签 */}
           <div
             style={{
               padding: "3px 8px",
@@ -148,7 +143,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
             89 species
           </div>
 
-          {/* 多条对齐序列（初始不对齐） */}
           <div
             style={{
               display: "flex",
@@ -197,7 +191,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
             ))}
           </div>
 
-          {/* 维度标签 */}
           <motion.div
             animate={isActive || isCompleted ? { opacity: 1 } : { opacity: 0 }}
             transition={{ duration: 0.5, delay: 1.5 }}
@@ -213,7 +206,6 @@ export default function Step2MSAAlignment({ isActive, isCompleted }) {
         </div>
       </div>
 
-      {/* 文字 */}
       <div style={{ textAlign: "center" }}>
         <h3 style={{ fontSize: "26px", fontWeight: "700", margin: 0 }}>
           MSA Alignment
