@@ -1,10 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FcFilmReel } from "react-icons/fc";
+import ModelToggle from "../components/interactivePages/ModelToggle"
+import RegionList from "../components/interactivePages/RegionList";
+import PredictionDetail from "../components/interactivePages/PredictionDetail";
+import ComparisonList from "../components/interactivePages/ComparisonList";
+import { gpnMsa, gpn } from "../constants/predictionData";
 
 export default function InteractivePage() {
   const navigate = useNavigate();
+  const [selectedModel, setSelectedModel] = useState("GPN-MSA");
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [showComparison, setShowComparison] = useState(false);
+
+ 
+  const currentRegions = selectedModel === "GPN-MSA" ? gpnMsa : gpn;
+
+
+  const handleModelChange = (model) => {
+    setSelectedModel(model);
+    setSelectedRegion(null);
+    setShowComparison(false);
+  };
 
   return (
     <div
@@ -17,6 +34,7 @@ export default function InteractivePage() {
         position: "relative",
       }}
     >
+      {/* Back button */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
@@ -40,34 +58,76 @@ export default function InteractivePage() {
         Back
       </motion.button>
 
-      <div style={{ maxWidth: "1200px", margin: "0 auto", paddingTop: "80px" }}>
+      {/* Main content */}
+      <div
+        style={{
+          maxWidth: "1400px",
+          margin: "0 auto",
+          paddingTop: "80px",
+        }}
+      >
+        {/* Title*/}
         <motion.h1
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           style={{
             fontSize: "clamp(32px, 4vw, 48px)",
-            marginBottom: "40px",
+            marginBottom: "20px",
             textAlign: "center",
           }}
         >
-          <FcFilmReel /> Interactive Exploration
+          Interactive Conservation Prediction
         </motion.h1>
 
-        <motion.div
+        <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
           style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            backdropFilter: "blur(10px)",
-            borderRadius: "16px",
-            padding: "40px",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
+            fontSize: "18px",
+            textAlign: "center",
+            color: "#aaa",
+            marginBottom: "30px",
           }}
         >
-          <p style={{ fontSize: "18px", lineHeight: 1.8 }}></p>
-        </motion.div>
+          Explore conserved lncRNA regions predicted by GPN and GPN-MSA models
+        </motion.p>
+
+        {/* model toggle */}
+        <ModelToggle
+          selectedModel={selectedModel}
+          onModelChange={handleModelChange}
+        />
+
+        {/* Main area */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "400px 1fr",
+            gap: "30px",
+            marginBottom: "40px",
+          }}
+        >
+          {/* Left：gene list */}
+          <RegionList
+            regions={currentRegions}
+            selectedRegion={selectedRegion}
+            onSelectRegion={setSelectedRegion}
+            onViewAll={() => setShowComparison(!showComparison)}
+            modelName={selectedModel}
+          />
+
+          {/* Right: detail */}
+          <PredictionDetail region={selectedRegion} modelName={selectedModel} />
+        </div>
+
+        {/* Bottom: Comparison list  */}
+        <ComparisonList
+          gpnRegions={gpn}
+          gpnMsaRegions={gpnMsa}
+          isVisible={showComparison}
+        />
       </div>
     </div>
   );
